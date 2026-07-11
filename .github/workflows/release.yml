@@ -1,0 +1,52 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. ayatana-v1)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
+
+      - name: Install GNOME SDK
+        run: |
+          flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user -y --noninteractive flathub org.gnome.Sdk//50 org.gnome.Platform//50
+
+      - name: Build stack
+        run: flatpak-builder --user --force-clean --disable-rofiles-fuse builddir ayatana-stack.yml
+
+      - name: Pack
+        id: pack
+        run: |
+          set -euo pipefail
+          name="ayatana-stack-${{ inputs.tag }}-gnome-50-x86_64.tar.xz"
+          # Single top-level dir so flatpak-builder's default strip-components=1
+          # leaves lib/... at the extraction root.
+          mv builddir/files ayatana-stack
+          # Deterministic-ish tar: sorted names, fixed owner.
+          XZ_OPT=-T0 tar --sort=name --owner=0 --group=0 --numeric-owner -cJf "$name" ayatana-stack
+          sha256sum "$name" | tee "$name.sha256"
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${{ inputs.tag }}" \
+            "${{ steps.pack.outputs.name }}" \
+            "${{ steps.pack.outputs.name }}.sha256" \
+            --title "ayatana-stack ${{ inputs.tag }} (GNOME 50, x86_64)" \
+            --notes "libdbusmenu 16.04.0 + ayatana-ido 0.10.4 + libayatana-indicator 0.9.4 + libayatana-appindicator 0.5.94, built against org.gnome.Sdk//50 by workflow run ${{ github.run_id }} from commit ${{ github.sha }}. Exact sources, pins and patches: ayatana-stack.yml at this tag."

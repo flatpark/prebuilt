@@ -1,0 +1,76 @@
+# WeMeet Wayland-screenshare support stack — KNOWN-GOOD variant.
+#
+# xuwd1/wemeet-wayland-screenshare builds libhook.so, an LD_PRELOAD shim that
+# makes WeMeet's X11 SHM screen-capture path work while the app is forced onto
+# XWayland (QT_QPA_PLATFORM=xcb). It needs opencv (core+imgproc, for aspect-
+# ratio scaling) and libportal, which the freedesktop runtime does not ship —
+# so every WeMeet build would otherwise recompile opencv from source. This
+# manifest builds the chain ONCE; the release workflow tars files/ so the
+# consuming WeMeet manifest pins a single archive instead.
+#
+# This variant carries the dep set Flathub's com.tencent.wemeet master shipped
+# alongside the hook (libportal 0.9.1 + opencv 4.13.0). The hook's CMake probes
+# for opencv2/core/core_c.h; opencv 4.x still ships that C-API header, so this
+# is the high-confidence build. The opencv5 variant is the PR #75 upgrade.
+#
+# Module definitions are copied verbatim from com.tencent.wemeet.yml (master)
+# and PR #72 — this file is the provenance record for the released tarball.
+id: org.flatpark.Prebuilt.WemeetScreenshareStack
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+
+modules:
+  - name: libportal
+    buildsystem: meson
+    config-opts:
+      - -Dbackend-gtk3=enabled
+      - -Dbackend-gtk4=disabled
+      - -Dbackend-qt5=disabled
+      - -Dbackend-qt6=disabled
+      - -Dintrospection=false
+      - -Dvapi=false
+      - -Ddocs=false
+      - -Dtests=false
+    sources:
+      - type: archive
+        url: https://github.com/flatpak/libportal/archive/0.9.1.tar.gz
+        sha256: ea422b789ae487e04194d387bea031fd7485bf88a18aef8c767f7d1c29496a4e
+
+  - name: opencv
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DOPENCV_GENERATE_PKGCONFIG=ON
+      - -DBUILD_LIST=imgproc
+    cleanup:
+      - /bin
+      - /share/opencv4
+    sources:
+      - type: archive
+        url: https://github.com/opencv/opencv/archive/4.13.0.tar.gz
+        sha256: 1d40ca017ea51c533cf9fd5cbde5b5fe7ae248291ddf2af99d4c17cf8e13017d
+
+  - name: wemeet-wayland-screenshare
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    post-install:
+      # WeMeet / the hook dlopen these by their unversioned soname; the Platform
+      # runtime only ships the versioned .so.N, so link them into /app/lib.
+      - ln -Tsv /usr/lib/$(gcc --print-multiarch)/libXext.so.? /app/lib/libXext.so
+      - ln -Tsv /usr/lib/$(gcc --print-multiarch)/libXdamage.so.? /app/lib/libXdamage.so
+    sources:
+      - type: git
+        url: https://github.com/xuwd1/wemeet-wayland-screenshare.git
+        commit: ab226c63380c4233e2f490ba17e6ea8f393999e2

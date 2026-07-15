@@ -1,0 +1,75 @@
+# WeMeet Wayland-screenshare support stack — PR #75 UPGRADE variant.
+#
+# Same stack as wemeet-screenshare-stack-opencv4.yml, but carrying the
+# flatpak-external-data-checker upgrade proposed in
+# flathub/com.tencent.wemeet#75: libportal 0.9.1 -> 0.10.0 and
+# opencv 4.13.0 -> 5.0.0.
+#
+# COMPAT NOTE: xuwd1/wemeet-wayland-screenshare's CMake probes for
+# opencv2/core/core_c.h (the legacy C API). If opencv 5.0 has dropped that
+# header the hook module fails to configure — in which case keep pinning the
+# opencv4 variant. That is exactly why both variants exist. The hook itself
+# only uses cv::resize (imgproc), whose signature is stable across 4->5, so if
+# it configures it should build.
+#
+# Module definitions are copied verbatim from com.tencent.wemeet.yml (master)
+# + PR #75 (deps) + PR #72 (hook) — this file is the provenance record for the
+# released tarball.
+id: org.flatpark.Prebuilt.WemeetScreenshareStack
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+cleanup:
+  - /include
+  - /lib/cmake
+  - /lib/pkgconfig
+  - /share/doc
+  - /share/man
+
+modules:
+  - name: libportal
+    buildsystem: meson
+    config-opts:
+      - -Dbackend-gtk3=enabled
+      - -Dbackend-gtk4=disabled
+      - -Dbackend-qt5=disabled
+      - -Dbackend-qt6=disabled
+      - -Dintrospection=false
+      - -Dvapi=false
+      - -Ddocs=false
+      - -Dtests=false
+    sources:
+      - type: archive
+        url: https://github.com/flatpak/libportal/archive/0.10.0.tar.gz
+        sha256: e1b6913c6d9015bfa918ace86f82c30940982add97aed9c18cc929c5327054fd
+
+  - name: opencv
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DOPENCV_GENERATE_PKGCONFIG=ON
+      - -DBUILD_LIST=imgproc
+    cleanup:
+      - /bin
+      - /share/opencv4
+      - /share/opencv5
+    sources:
+      - type: archive
+        url: https://github.com/opencv/opencv/archive/5.0.0.tar.gz
+        sha256: b0528f5a1d379d59d4701cb28c36e22214cc51cf64594e5b56f2d3e6c0233095
+
+  - name: wemeet-wayland-screenshare
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+    post-install:
+      - ln -Tsv /usr/lib/$(gcc --print-multiarch)/libXext.so.? /app/lib/libXext.so
+      - ln -Tsv /usr/lib/$(gcc --print-multiarch)/libXdamage.so.? /app/lib/libXdamage.so
+    sources:
+      - type: git
+        url: https://github.com/xuwd1/wemeet-wayland-screenshare.git
+        commit: ab226c63380c4233e2f490ba17e6ea8f393999e2

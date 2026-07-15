@@ -5,12 +5,18 @@
 # flathub/com.tencent.wemeet#75: libportal 0.9.1 -> 0.10.0 and
 # opencv 4.13.0 -> 5.0.0.
 #
-# COMPAT NOTE: xuwd1/wemeet-wayland-screenshare's CMake probes for
-# opencv2/core/core_c.h (the legacy C API). If opencv 5.0 has dropped that
-# header the hook module fails to configure — in which case keep pinning the
-# opencv4 variant. That is exactly why both variants exist. The hook itself
-# only uses cv::resize (imgproc), whose signature is stable across 4->5, so if
-# it configures it should build.
+# CONFIRMED INCOMPATIBLE — DO NOT RELEASE (kept for provenance).
+# opencv 5.0.0 removed the legacy C-API headers opencv2/core/core_c.h and
+# opencv2/imgproc/imgproc_c.h, which the (archived, frozen) hook sources
+# hook_opencv.hpp / format.hpp #include. opencv itself builds fine against 5.0,
+# but the hook module then fails to compile:
+#     fatal error: opencv2/core/core_c.h: No such file or directory
+# (workflow run 29394775946). Building this against opencv 5 would require
+# patching the upstream hook to drop the C API. Use the opencv4 variant.
+#
+# Note: libhook.so ends up with NO opencv in its DT_NEEDED and zero undefined
+# cv:: symbols — opencv is a build-time-headers-only dependency here, so opencv4
+# vs opencv5 is strictly a compile-time concern, not a runtime one.
 #
 # Module definitions are copied verbatim from com.tencent.wemeet.yml (master)
 # + PR #75 (deps) + PR #72 (hook) — this file is the provenance record for the

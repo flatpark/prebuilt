@@ -33,6 +33,10 @@ modules:
   - name: libportal
     buildsystem: meson
     config-opts:
+      # Force lib/ (not the multiarch lib/x86_64-linux-gnu/) so libportal.pc lands
+      # on the default PKG_CONFIG_PATH and the hook's pkg_check_modules finds it,
+      # and libportal.so lands in /app/lib for the runtime linker.
+      - --libdir=lib
       - -Dbackend-gtk3=enabled
       - -Dbackend-gtk4=disabled
       - -Dbackend-qt5=disabled
@@ -53,6 +57,8 @@ modules:
       - -DCMAKE_BUILD_TYPE=Release
       - -DOPENCV_GENERATE_PKGCONFIG=ON
       - -DBUILD_LIST=imgproc
+      # Keep opencv libs in /app/lib so libhook.so's DT_NEEDED resolves at runtime.
+      - -DCMAKE_INSTALL_LIBDIR=lib
     cleanup:
       - /bin
       - /share/opencv4

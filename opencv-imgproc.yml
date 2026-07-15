@@ -1,0 +1,39 @@
+# OpenCV (core + imgproc), prebuilt for FlatPark apps.
+#
+# A reusable, dev-complete OpenCV build against the freedesktop runtime — libs,
+# headers, CMake config and pkg-config, so a consuming app manifest can build
+# against it (find_package(OpenCV) / pkg_check_modules(opencv4)) without
+# recompiling OpenCV from source. First consumer: wemeet-screenshare-hook.yml.
+# Scope is intentionally core+imgproc (BUILD_LIST=imgproc) to keep the archive
+# small; widen BUILD_LIST here and cut a new tag if another app needs more.
+#
+# Not app-specific — the name carries no app, so other FlatPark apps can pin the
+# same archive, the same way Tauri apps share ayatana-stack.
+id: org.flatpark.Prebuilt.OpenCVImgproc
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+cleanup:
+  # Keep /include, /lib/cmake and /lib/pkgconfig — downstream builds need them.
+  - /bin
+  - /share/doc
+  - /share/man
+
+modules:
+  - name: opencv
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DOPENCV_GENERATE_PKGCONFIG=ON
+      - -DBUILD_LIST=imgproc
+      # Keep libs in /app/lib (not lib64/multiarch) so consumers on the apt
+      # flatpak-builder find them on the default link/pkg-config paths.
+      - -DCMAKE_INSTALL_LIBDIR=lib
+    sources:
+      - type: archive
+        url: https://github.com/opencv/opencv/archive/4.13.0.tar.gz
+        sha256: 1d40ca017ea51c533cf9fd5cbde5b5fe7ae248291ddf2af99d4c17cf8e13017d

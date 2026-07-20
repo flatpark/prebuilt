@@ -1,0 +1,51 @@
+# OpenSSL 1.1.1, prebuilt as a runtime-only compatibility shim for FlatPark apps.
+#
+# Why this exists: a self-contained .NET 5 payload dlopens libssl by soname and
+# only knows the 1.0.x / 1.1 names — .NET did not learn to load OpenSSL 3 until
+# .NET 6. On a runtime that ships OpenSSL 3 such an app aborts during startup
+# with "No usable version of libssl was found", before it draws a window. There
+# is no way around shipping the old soname: symlinking it onto libssl.so.3 is an
+# ABI mismatch and crashes. First consumer: cn.com._10jqka.THS (THS / 同花顺).
+#
+# READ BEFORE PINNING THIS:
+# The 1.1.1 series reached end of life in September 2023 and receives no further
+# upstream security fixes. This stack exists only to keep otherwise-unrunnable
+# legacy payloads working, and a consuming app should drop it the moment its
+# upstream ships a .NET 6+ (or otherwise OpenSSL 3-capable) build. Do not reach
+# for it as a general-purpose OpenSSL.
+#
+# Scope is deliberately runtime-only: just libssl.so.1.1 and libcrypto.so.1.1,
+# no headers, no pkg-config, no binaries. Nothing is meant to *build* against
+# this — consumers only need the two sonames present at runtime.
+#
+# Consumers must install these under a private directory and put it LAST on the
+# app's LD_LIBRARY_PATH, so the shim is reachable by soname lookup but never
+# shadows the runtime's own OpenSSL 3 for anything else in the sandbox.
+id: org.flatpark.Prebuilt.OpenSSL11
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+
+modules:
+  - name: openssl-1.1
+    buildsystem: simple
+    build-commands:
+      # --openssldir points at the runtime's own store so the shim shares its
+      # certificate trust rather than carrying a second, stale CA bundle.
+      # no-ssl3/no-comp drop protocol features that are unsafe and unused here.
+      - ./config --prefix=/app --openssldir=/etc/ssl shared no-tests no-ssl3 no-comp
+      # build_libs, not the default target: only the shared libraries are wanted,
+      # and it skips building the apps/ CLI entirely.
+      - make -j${FLATPAK_BUILDER_N_JOBS:-4} build_libs
+      # Installed by hand rather than via `make install_sw`, which would also
+      # drop headers, pkg-config and an /app/etc tree that this stack has no
+      # business shipping.
+      - install -Dm755 libssl.so.1.1 /app/lib/openssl-1.1/libssl.so.1.1
+      - install -Dm755 libcrypto.so.1.1 /app/lib/openssl-1.1/libcrypto.so.1.1
+    sources:
+      - type: archive
+        url: https://www.openssl.org/source/openssl-1.1.1w.tar.gz
+        sha256: cf3098950cb4d853ad95c0841f1f9c6d3dc102dccfcacd521d93925208b76ac8

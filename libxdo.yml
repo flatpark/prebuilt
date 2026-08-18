@@ -1,0 +1,49 @@
+# libxdo (from xdotool), prebuilt for FlatPark apps.
+#
+# The GNOME runtime does not ship libxdo. Applications that automate X11 input
+# — anything linking the enigo crate, which is the common case for a Tauri app
+# offering dictation or a "type this into the focused window" feature — carry
+# libxdo.so.3 in DT_NEEDED and cannot start without it. First consumer:
+# io.github.thewh1teagle.vibe.
+#
+# Pinned to the xdotool 3.x series on purpose: the Makefile takes the library
+# soname from the major version, so 3.x installs libxdo.so.3 while 4.x installs
+# libxdo.so.4. Payloads built against Debian/Ubuntu's libxdo3 need the former.
+# Bumping this to 4.x is an ABI change for consumers, not a refresh — cut a
+# separate tag for it if an app ever needs libxdo.so.4.
+#
+# Runtime shim only: the shared library, no headers, no pkg-config, and not the
+# xdotool CLI. Everything it links (libXtst, libXi, libXinerama, libX11,
+# libxkbcommon) comes from the runtime.
+#
+# Not app-specific — the name carries no app, so other FlatPark apps can pin the
+# same archive, the same way Tauri apps share ayatana-stack.
+id: org.flatpark.Prebuilt.Libxdo
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+cleanup:
+  # Runtime consumers link against the soname; drop the development symlink,
+  # headers and pkg-config file that `make installlib`/`installheader` leave.
+  - /lib/libxdo.so
+  - /include
+  - /lib/pkgconfig
+  - /bin
+  - /share/man
+
+modules:
+  - name: libxdo
+    buildsystem: simple
+    build-commands:
+      # `all` would also build the xdotool CLI and its manpage (which needs
+      # perl's pod2man); build just the versioned library.
+      - make libxdo.so.3
+      - make installlib PREFIX=/app INSTALLLIB=/app/lib
+    sources:
+      - type: git
+        url: https://github.com/jordansissel/xdotool.git
+        tag: v3.20211022.1
+        commit: eb489de1b4fb3fd0cd935d68ae16ecd4c653ac7d

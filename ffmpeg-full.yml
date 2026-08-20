@@ -60,7 +60,11 @@ modules:
   - name: x264
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/x264-v1/x264-x264-v1-gnome-50-x86_64.tar.xz
@@ -69,7 +73,11 @@ modules:
   - name: x265
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/x265-v1/x265-x265-v1-gnome-50-x86_64.tar.xz
@@ -78,7 +86,11 @@ modules:
   - name: lame
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/lame-v1/lame-lame-v1-gnome-50-x86_64.tar.xz
@@ -87,7 +99,11 @@ modules:
   - name: rubberband
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/rubberband-v1/rubberband-rubberband-v1-gnome-50-x86_64.tar.xz
@@ -96,7 +112,11 @@ modules:
   - name: libass
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/libass-v1/libass-libass-v1-gnome-50-x86_64.tar.xz
@@ -105,7 +125,11 @@ modules:
   - name: libvpl
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/libvpl-v1/libvpl-libvpl-v1-gnome-50-x86_64.tar.xz
@@ -135,6 +159,10 @@ modules:
       - --disable-doc
       - --disable-static
       - --enable-shared
+      # ffplay is an SDL2 debug player no consumer drives, and shipping it puts
+      # an `ffplay` command on the consuming app's PATH — a behaviour surface
+      # this stack has no reason to add.
+      - --disable-ffplay
       - --enable-gnutls
       # GPL + version3 are required by x264, x265 and rubberband.
       - --enable-gpl

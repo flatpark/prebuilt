@@ -47,7 +47,11 @@ modules:
   - name: leptonica
     buildsystem: simple
     build-commands:
-      - cp -a ./. /app/
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
         url: https://github.com/flatpark/prebuilt/releases/download/leptonica-v1/leptonica-leptonica-v1-gnome-50-x86_64.tar.xz

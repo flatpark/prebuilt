@@ -167,6 +167,10 @@ modules:
       # harfbuzz 11.4.5 is in org.gnome.Sdk//50 and libharfbuzz.so.0 in the
       # Platform, so this costs nothing and travels with nothing.
       - --enable-libharfbuzz
+      # ...and fontconfig on top of those two, or drawtext only accepts
+      # fontfile=/abs/path and refuses font=Sans. libass already resolves fonts
+      # this way, and fontconfig is in both the SDK and the Platform.
+      - --enable-libfontconfig
       - --enable-libmp3lame
       - --enable-libopus
       - --enable-librubberband

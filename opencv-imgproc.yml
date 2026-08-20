@@ -9,18 +9,36 @@
 #
 # Not app-specific — the name carries no app, so other FlatPark apps can pin the
 # same archive, the same way Tauri apps share ayatana-stack.
+#
+# Consumed as extra-data by com.tencent.wemeet: the app's apply_extra unpacks the
+# archive to /app/extra/opencv-imgproc/ and its wrapper puts that lib/ last on
+# LD_LIBRARY_PATH, which is where the screenshare hook's dlopen() of the
+# UNVERSIONED soname finds it. The unversioned development symlinks are therefore
+# load-bearing at runtime, not just at build time — do not prune them.
 id: org.flatpark.Prebuilt.OpenCVImgproc
 runtime: org.freedesktop.Platform
 runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 command: /usr/bin/true
 build-options:
+  # OpenCV's Release build still carries full DWARF, and no-debuginfo only
+  # suppresses the .Debug extension — on its own it does not strip. Unstripped,
+  # core + imgproc are ~140 MB of ELF (34 MB packed); stripping takes the
+  # archive to a fraction of that. It matters because this stack is consumed as
+  # extra-data (see the header): the bytes land on each user's disk rather than
+  # being shared out of an OSTree commit, and nothing here is ever debugged in
+  # place — a consumer that needs symbols rebuilds from this manifest at its tag.
   no-debuginfo: true
+  strip: true
 cleanup:
   # Keep /include, /lib/cmake and /lib/pkgconfig — downstream builds need them.
   - /bin
   - /share/doc
   - /share/man
+  # 9.7 MB of Haar/LBP cascade XML and valgrind suppressions. The cascades are
+  # objdetect training data; BUILD_LIST=imgproc ships no objdetect module, so
+  # nothing here can load them. They were two thirds of the unpacked tree.
+  - /share/opencv4
 
 modules:
   - name: opencv

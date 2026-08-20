@@ -36,7 +36,11 @@ runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 command: /usr/bin/true
 build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
   no-debuginfo: true
+  strip: true
 
 modules:
   - name: krb5-gss

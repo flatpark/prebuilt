@@ -24,7 +24,11 @@ runtime-version: "50"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
   no-debuginfo: true
+  strip: true
 cleanup:
   # Runtime consumers link against the soname; drop the development symlink,
   # headers and pkg-config file that `make installlib`/`installheader` leave.

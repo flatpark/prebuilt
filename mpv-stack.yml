@@ -1,0 +1,87 @@
+# mpv + its two non-runtime dependencies, prebuilt for FlatPark apps.
+#
+# Several registry apps need libmpv for video playback: Subtitle Edit dlopen()s
+# libmpv.so.2 for its video preview, Harbor Beta plays streams with it. The
+# GNOME runtime ships neither libmpv nor the libass/libplacebo that mpv needs,
+# so each app compiled the same three projects from git — the single slowest
+# part of either build, repeated per app and per rebuild. This manifest builds
+# the chain once against the GNOME SDK the apps target; the release workflow
+# tars the result so app manifests consume a single pinned archive instead.
+#
+# Module definitions (sources, pins, config) are copied verbatim from the
+# registry manifests they replace — this file is the provenance record for the
+# released tarball. The one reconciliation: the apps disagreed on mpv's
+# `cplayer`, so the stack builds the superset (`-Dcplayer=true`, i.e. libmpv
+# plus the `mpv` command-line player), which is what Harbor Beta shipped.
+#
+# The cleanup lists strip what only a *build* against this stack would need
+# (headers, pkg-config files) and what would be dead weight inside an app
+# sandbox (mpv's own desktop entry, icons, docs and shell completions).
+# flatpak-builder defers cleanup to the end of the build, so removing a
+# module's .pc file does not hide it from the module built after it.
+id: org.flatpark.Prebuilt.MpvStack
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+modules:
+  - name: libass
+    buildsystem: autotools
+    cleanup:
+      - "*.la"
+      - /include
+      - /lib/pkgconfig
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+      - --enable-shared
+    sources:
+      - type: git
+        url: https://github.com/libass/libass.git
+        tag: "0.17.3"
+        commit: e46aedea0a0d17da4c4ef49d84b94a7994664ab5
+
+  - name: libplacebo
+    buildsystem: meson
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+    config-opts:
+      - --libdir=lib
+      - -Ddefault_library=shared
+      - -Dtests=false
+      - -Ddemos=false
+    sources:
+      - type: git
+        url: https://github.com/haasn/libplacebo.git
+        tag: v7.360.1
+        commit: cee9b076f2c63104ccfd497fa79c39a867293ec4
+
+  - name: mpv
+    buildsystem: meson
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/applications
+      - /share/bash-completion
+      - /share/fish
+      - /share/zsh
+      - /share/doc
+      - /share/icons
+      - /share/metainfo
+    config-opts:
+      - --libdir=lib
+      - -Dlibmpv=true
+      - -Dcplayer=true
+      - -Dbuild-date=false
+      - -Dmanpage-build=disabled
+      - -Dtests=false
+      - -Dlua=disabled
+      - -Djavascript=disabled
+    sources:
+      - type: git
+        url: https://github.com/mpv-player/mpv.git
+        tag: v0.40.0
+        commit: e48ac7ce08462f5e33af6ef9deeac6fa87eef01e

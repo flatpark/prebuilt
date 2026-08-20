@@ -1,0 +1,46 @@
+# Rubber Band, prebuilt for FlatPark apps.
+#
+# Time-stretching and pitch-shifting library. ffmpeg links it for the
+# `rubberband` audio filter — changing playback speed without changing pitch,
+# which is what a subtitle or media editor uses when retiming audio to video.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it; ffmpeg-full.yml does. The FFT and resampler backends are pinned to the
+# built-in implementations rather than left on autodetection: fftw3, libsamplerate
+# and speexdsp are all present in the GNOME SDK, so meson would happily pick a
+# different backend if upstream ever changed its defaults, and the archive would
+# silently gain a DT_NEEDED. Built-in is also what upstream selects by default.
+# The result links nothing outside libstdc++/libm/libgcc/libc.
+id: org.flatpark.Prebuilt.Rubberband
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - /share/doc
+  - /share/man
+  # A LADSPA plugin is only reachable from a LADSPA host scanning a system plugin
+  # path; unpacked under an app's /app/extra it can never be found. The
+  # rubberband/rubberband-r3 CLIs are kept — they are this library's own front end.
+  - /lib/ladspa
+  - /share/ladspa
+
+modules:
+  - name: rubberband
+    buildsystem: meson
+    config-opts:
+      - --libdir=lib
+      - -Dfft=builtin
+      - -Dresampler=builtin
+    sources:
+      - type: git
+        url: https://github.com/breakfastquay/rubberband.git
+        tag: v4.0.0
+        commit: 1d95888bec3ae0a17c0c4af791810d5a63f6bc35

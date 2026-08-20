@@ -1,0 +1,39 @@
+# uchardet, prebuilt for FlatPark apps.
+#
+# Mozilla's charset detector, maintained at freedesktop. An app that opens text
+# files it did not write — subtitle files being the obvious case, which arrive as
+# CP1252, Big5, Shift_JIS or GB18030 with nothing declaring which — uses it to
+# guess the encoding before decoding. Neither runtime ships it.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it. The `uchardet` CLI is not shipped: consumers link the library.
+id: org.flatpark.Prebuilt.Uchardet
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - /bin
+  - /share/man
+
+modules:
+  - name: uchardet
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DBUILD_STATIC=0
+      # uchardet 0.0.8 declares cmake_minimum_required below 3.5, which CMake 4
+      # refuses outright.
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+    sources:
+      - type: archive
+        url: https://www.freedesktop.org/software/uchardet/releases/uchardet-0.0.8.tar.xz
+        sha256: e97a60cfc00a1c147a674b097bb1422abd9fa78a2d9ce3f3fdcc2e78a34ac5f0

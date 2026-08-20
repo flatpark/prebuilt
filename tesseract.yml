@@ -1,0 +1,67 @@
+# Tesseract OCR, prebuilt for FlatPark apps.
+#
+# The OCR engine itself plus its `tesseract` command-line driver, which is how
+# most applications actually use it — they write an image out and shell out.
+# Neither runtime ships it.
+#
+# Leptonica is needed at BUILD time (headers, and libtesseract links it) and at
+# RUNTIME (that DT_NEEDED does not go away), but it is NOT shipped in this
+# archive: it is its own release, and a consuming app pins leptonica-v1 as well
+# and puts both lib/ directories on LD_LIBRARY_PATH. Same split as
+# wemeet-screenshare-hook and opencv-imgproc. Keeping one leptonica per app
+# rather than one per dependent stack is the whole point of releasing it
+# separately.
+#
+# No language data. `eng.traineddata` and friends are ~20 MB each, versioned
+# independently of the engine, and an app usually wants a different set of them;
+# they belong in the consuming app as extra-data. The archive DOES carry
+# share/tessdata/{configs,tessconfigs}, the output-format presets tesseract reads
+# from TESSDATA_PREFIX (`hocr`, `tsv`, `pdf`, ...) — so a consuming app should
+# stage its .traineddata files INTO this archive's share/tessdata/ and point
+# TESSDATA_PREFIX there, keeping presets and language data in one directory.
+# The training tools are not built — they are for producing that data, not using it.
+id: org.flatpark.Prebuilt.Tesseract
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - "*.la"
+  # Leptonica is build-time input from its own release; drop every trace of it
+  # so this archive carries Tesseract and nothing else.
+  - /lib/libleptonica.*
+  - /lib/cmake/leptonica
+  - /lib/pkgconfig/lept*
+  - /include/leptonica
+
+modules:
+  # Leptonica headers and library for the build only, from the reusable release.
+  # Cleaned out of the final archive above.
+  - name: leptonica
+    buildsystem: simple
+    build-commands:
+      - cp -a ./. /app/
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/leptonica-v1/leptonica-leptonica-v1-gnome-50-x86_64.tar.xz
+        sha256: 150639275c0b5487d530289610a62f9626e9e74c51aa45cba865461937a7bead
+
+  - name: tesseract
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DBUILD_SHARED_LIBS=ON
+      - -DBUILD_TRAINING_TOOLS=OFF
+    sources:
+      - type: archive
+        url: https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.1.tar.gz
+        sha256: a7a3f2a7420cb6a6a94d80c24163e183cf1d2f1bed2df3bbc397c81808a57237

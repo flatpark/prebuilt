@@ -21,6 +21,7 @@ and commit that produced the artifact.
 | Stack | Contents | Built against | Used by |
 |---|---|---|---|
 | `ayatana-stack` | libdbusmenu 16.04.0, ayatana-ido 0.10.4, libayatana-indicator 0.9.4, libayatana-appindicator 0.5.94 | `org.gnome.Sdk//50` | Tauri apps needing a tray icon |
+| `mpv-stack` | libass 0.17.3, libplacebo v7.360.1, mpv v0.40.0 (`libmpv.so.2` **and** the `mpv` command-line player) | `org.gnome.Sdk//50` | Apps that play video with mpv — `dk.nikse.subtitleedit` (dlopens libmpv for the video preview), `site.harbor.Harbor.Beta` (embeds libmpv, and spawns `mpv` for thumbnails, clip encoding and multiview) |
 | `libxdo` | libxdo from xdotool 3.20211022.1, shared library only (soname `libxdo.so.3`) — no headers, no `xdotool` CLI | `org.gnome.Sdk//50` | Apps that link libxdo for X11 input automation (the enigo crate), e.g. `io.github.thewh1teagle.vibe` |
 | `opencv-imgproc` | OpenCV 4.13.0 (core + imgproc), dev-complete (libs + headers + CMake/pkg-config) | `org.freedesktop.Sdk//25.08` | Apps that build against OpenCV |
 | `openssl-1.1-compat` | OpenSSL 1.1.1w shared libraries only (`libssl.so.1.1`, `libcrypto.so.1.1`) — no headers, runtime shim | `org.freedesktop.Sdk//25.08` | Legacy payloads whose bundled runtime predates OpenSSL 3 support (e.g. self-contained .NET 5) — **1.1.1 is EOL, see the manifest header** |

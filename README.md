@@ -16,6 +16,12 @@ git tag + commit) and carries the patches verbatim, so a release can be
 reproduced and audited from the tag alone. Release notes name the workflow run
 and commit that produced the artifact.
 
+Every stack is built with `no-debuginfo: true` **and** `strip: true`. The first
+alone only suppresses the `.Debug` extension — it leaves the DWARF inside each
+library, which then travels in the archive and, for a stack consumed as an
+archive module, into the consuming app's OSTree commit. Symbols are recovered by
+rebuilding from the manifest at the tag, not by shipping them to every user.
+
 ## Stacks
 
 | Stack | Contents | Built against | Used by |
@@ -23,7 +29,7 @@ and commit that produced the artifact.
 | `ayatana-stack` | libdbusmenu 16.04.0, ayatana-ido 0.10.4, libayatana-indicator 0.9.4, libayatana-appindicator 0.5.94 | `org.gnome.Sdk//50` | Tauri apps needing a tray icon |
 | `mpv-stack` | libass 0.17.3, libplacebo v7.360.1, mpv v0.40.0 (`libmpv.so.2` **and** the `mpv` command-line player) | `org.gnome.Sdk//50` | Apps that play video with mpv — `dk.nikse.subtitleedit` (dlopens libmpv for the video preview), `site.harbor.Harbor.Beta` (embeds libmpv, and spawns `mpv` for thumbnails, clip encoding and multiview) |
 | `libxdo` | libxdo from xdotool 3.20211022.1, shared library only (soname `libxdo.so.3`) — no headers, no `xdotool` CLI | `org.gnome.Sdk//50` | Apps that link libxdo for X11 input automation (the enigo crate), e.g. `io.github.thewh1teagle.vibe` |
-| `opencv-imgproc` | OpenCV 4.13.0 (core + imgproc), dev-complete (libs + headers + CMake/pkg-config) | `org.freedesktop.Sdk//25.08` | Apps that build against OpenCV |
+| `opencv-imgproc` | OpenCV 4.13.0 (core + imgproc), dev-complete (libs + headers + CMake/pkg-config); no `share/opencv4` cascade data | `org.freedesktop.Sdk//25.08` | `wemeet-screenshare-hook` builds against it; `com.tencent.wemeet` ships it as **extra-data** because the hook `dlopen`s OpenCV by unversioned soname |
 | `openssl-1.1-compat` | OpenSSL 1.1.1w shared libraries only (`libssl.so.1.1`, `libcrypto.so.1.1`) — no headers, runtime shim | `org.freedesktop.Sdk//25.08` | Legacy payloads whose bundled runtime predates OpenSSL 3 support (e.g. self-contained .NET 5) — **1.1.1 is EOL, see the manifest header** |
 | `wemeet-screenshare-hook` | libportal 0.9.1 + xuwd1/wemeet-wayland-screenshare `libhook.so` (built against `opencv-imgproc`; OpenCV not shipped but **dlopen'd at runtime**, so the app must also ship `opencv-imgproc`) | `org.freedesktop.Sdk//25.08` | `com.tencent.wemeet` (XWayland screen-share hook) |
 | `krb5-gss` | MIT krb5 1.22.1, the load-time closure of `libgssapi_krb5.so.2` and nothing else (`libkrb5`, `libk5crypto`, `libcom_err`, `libkrb5support`) — no KDC/kadmin libraries, no plugin tree, no headers | `org.freedesktop.Sdk//25.08` | Payloads bundling a Qt built with the GSSAPI feature, whose `libQt6Network` then hard-links `libgssapi_krb5.so.2` — `com.interactivebrokers.ibkrdesktop`. **Consumed as extra-data**, see below |
@@ -33,18 +39,24 @@ and commit that produced the artifact.
 A stack can be consumed either way, and the choice decides where the bytes live:
 
 - **`type: archive` build module** (`ayatana-stack`, `mpv-stack`, `libxdo`,
-  `opencv-imgproc`, `openssl-1.1-compat`, `wemeet-screenshare-hook`) — the tree is
-  copied into `/app` at build time, so it becomes part of the app's OSTree commit
-  and is stored in FlatPark's own repository. Content-addressed storage means a
-  stack shared by many apps is held once; `ayatana-stack` is one object set for
-  thirteen apps.
-- **`type: extra-data`** (`krb5-gss`) — the archive is downloaded from this
-  repository's release at install time and unpacked by the app's `apply_extra`
+  `wemeet-screenshare-hook`) — the tree is copied into `/app` at build time, so
+  it becomes part of the app's OSTree commit and is stored in FlatPark's own
+  repository. Content-addressed storage means a stack shared by many apps is
+  held once; `ayatana-stack` is one object set for thirteen apps.
+- **`type: extra-data`** (`krb5-gss`, `openssl-1.1-compat`, `opencv-imgproc`) —
+  the archive is downloaded from this repository's release at install time and
+  unpacked by the app's `apply_extra`
   into `/app/extra/<stack>/`. FlatPark's repository holds nothing, and the
   bandwidth is GitHub's. The consuming wrapper must put `/app/extra/<stack>/lib`
   on `LD_LIBRARY_PATH`, since that path is not on the loader's default search
-  path. Worth it for a large stack with a single consumer, where content
-  addressing has nothing to deduplicate.
+  path — which also means the stack shadows nothing else in the sandbox.
+
+Prefer extra-data. FlatPark's repository is meant to hold app metadata, not
+built bytes, and a stack with one or two consumers gives content-addressed
+storage nothing to deduplicate anyway. The archive module remains the right
+answer where many apps share one stack (`ayatana-stack`, thirteen consumers):
+there the repository holds one object set, while extra-data would put a private
+copy on every user's disk and re-download it per app.
 
 ## Cutting a release
 

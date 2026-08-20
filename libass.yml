@@ -1,0 +1,49 @@
+# libass, prebuilt for FlatPark apps.
+#
+# ASS/SSA subtitle renderer. Two quite different consumers need it:
+#
+#   * ffmpeg, for the `ass` and `subtitles` filters — burning subtitles into a
+#     video. An ffmpeg built without libass fails at filter-graph parse time,
+#     not at run time, so the feature is simply absent.
+#   * mpv, which renders subtitles through it during playback.
+#
+# It exists as its own release precisely because of that overlap. mpv-stack
+# currently builds its own copy, which means an app that ships both mpv-stack and
+# an ffmpeg built against a different libass ends up with two libass.so.9 files
+# fighting over the same soname in /app/lib, resolved by module ordering. Pinning
+# one release here is the fix at the root: consume this from both and there is
+# one libass in the tree, at one version, by construction.
+#
+# Dev-complete (library + headers + pkg-config) so consumers can build against it.
+id: org.flatpark.Prebuilt.Libass
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  # .la files record absolute build paths and mislead a downstream libtool link.
+  - "*.la"
+
+modules:
+  - name: libass
+    buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+      # ASM rasteriser paths; nasm comes from the SDK.
+      - --enable-asm
+      # Font lookup through the runtime's fontconfig, so a subtitle naming a
+      # font by family resolves against the host's fonts rather than failing.
+      - --enable-fontconfig
+    sources:
+      - type: git
+        url: https://github.com/libass/libass.git
+        tag: "0.17.4"
+        commit: bbb3c7f1570a4a021e52683f3fbdf74fe492ae84

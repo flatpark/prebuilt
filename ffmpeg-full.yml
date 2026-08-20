@@ -1,0 +1,196 @@
+# FFmpeg, prebuilt for FlatPark apps.
+#
+# A full-featured ffmpeg/ffprobe pair. The runtimes do ship an ffmpeg, but it is
+# built for the runtime's own needs: no libass, so the `ass` and `subtitles`
+# filters do not exist and any attempt to burn subtitles into a video dies at
+# filter-graph parse time rather than at run time; and no hardware encoders
+# beyond the basics. Apps that drive ffmpeg as a tool need their own.
+#
+# The encoder set covers what a media application's export dialog typically
+# offers end to end: libx264, libx265, libvpx-vp9 and prores_ks in software,
+# VAAPI and NVENC for hardware, and aac, ac3, libmp3lame, libopus and libvorbis
+# for audio. First consumer: dk.nikse.subtitleedit (flatpark/flatpark#238).
+#
+# QSV and AMF are deliberately NOT enabled, and this is structural rather than a
+# preference. Both are two-layer: ffmpeg links a dispatcher (libvpl for QSV) or
+# dlopens a vendor library (libamfrt64.so.1 for AMF), and the layer that actually
+# encodes ships with the vendor's userspace — `libmfx-gen.so` from
+# intel-media-driver, or AMD's proprietary driver. Flatpak has no extension for
+# either, so neither can ever be present in a sandbox. Measured on an Intel
+# Arc 140V, the hardware QSV exists for, with --device=dri:
+#
+#   h264_vaapi  encode succeeded (exit 0)
+#   h264_qsv    Error creating a MFX session: -9   (dispatcher found no runtime)
+#   h264_amf    DLL libamfrt64.so.1 failed to open
+#
+# The GPU and the render node were never the problem — VAAPI used the same
+# /dev/dri/renderD128, because org.freedesktop.Platform.VAAPI.Intel and the
+# GL.* extensions do put a driver in the sandbox. NVENC is kept for the same
+# reason: org.freedesktop.Platform.GL.nvidia-* ships NVIDIA's userspace, so on an
+# NVIDIA host the library is there (not verified here — no NVIDIA GPU).
+#
+# Enabling them anyway is worse than leaving them out. Subtitle Edit 5.2 probes
+# `ffmpeg -encoders` and hides what is missing (SubtitleEdit/subtitleedit#13915),
+# but that probe sees "the encoder is compiled in" and cannot see "the vendor
+# runtime is absent" — so the entries would come back to the user's dropdown and
+# fail at encode time, which is the bug that probe was added to fix.
+#
+# Codec libraries the runtime lacks come from their OWN releases here — x264,
+# x265, lame, rubberband and libass — pinned below and used for the build.
+# They are then cleaned OUT of this archive: each is a separate release that the
+# consuming app pins and unpacks alongside this one, putting every lib/ on
+# LD_LIBRARY_PATH. That keeps one copy of libass in an app even when it also
+# ships mpv, and lets x265 move to a new version without re-cutting ffmpeg for
+# apps that only wanted the encoder.
+#
+# Everything else ffmpeg links here — gnutls, dav1d, freetype, opus, theora,
+# v4l2, vorbis, vpx, webp, xml2, vulkan — is present in both org.gnome.Sdk//50
+# and org.gnome.Platform//50, so it resolves against the runtime and travels
+# with nothing.
+id: org.flatpark.Prebuilt.FfmpegFull
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - "*.la"
+  - /include
+  - /lib/pkgconfig
+  - /lib/cmake
+  - /share/ffmpeg/examples
+  # Build-time input from the stacks below: shipped by the consuming app from
+  # their own releases, not from here.
+  - /lib/libx264.so*
+  - /lib/libx265.so*
+  - /lib/libmp3lame.so*
+  - /lib/librubberband.so*
+  - /lib/libass.so*
+  - /bin/rubberband
+  - /bin/rubberband-r3
+  - /etc
+
+modules:
+  # Codec libraries for the build, each from its own reusable release. All
+  # cleaned out of the final archive above; the consuming app ships them.
+  - name: x264
+    buildsystem: simple
+    build-commands:
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/x264-v1/x264-x264-v1-gnome-50-x86_64.tar.xz
+        sha256: f6d5ecf8620a60164d191aeb83ae9ba371e17fb0b3f217cce3d371f260c5f63f
+
+  - name: x265
+    buildsystem: simple
+    build-commands:
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/x265-v1/x265-x265-v1-gnome-50-x86_64.tar.xz
+        sha256: 0e11378f93862669a832cfb58ae016d039aa65d2acbb8c64fc2a5a9db41a337e
+
+  - name: lame
+    buildsystem: simple
+    build-commands:
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/lame-v1/lame-lame-v1-gnome-50-x86_64.tar.xz
+        sha256: cf65e7f57f5532f692ed7107af0cafb36afb2277f31c7cb749da206f56f0b396
+
+  - name: rubberband
+    buildsystem: simple
+    build-commands:
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/rubberband-v1/rubberband-rubberband-v1-gnome-50-x86_64.tar.xz
+        sha256: 8f88a7640b9eba33cba667d14f72b1261934e28fa6ba9dfbaa1396eac0c63f5f
+
+  - name: libass
+    buildsystem: simple
+    build-commands:
+      # Skip the archive's own manifest.json: copying it would leave a stale
+      # record of an unrelated stack in this release, renamed to the misleading
+      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
+      # so it cannot be cleaned away).
+      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    sources:
+      - type: archive
+        url: https://github.com/flatpark/prebuilt/releases/download/libass-v1/libass-libass-v1-gnome-50-x86_64.tar.xz
+        sha256: 2b246bd7d9f658b0678e366c8196d40daf1088433daeab9a01b06c15884b375d
+
+  - name: ffmpeg
+    buildsystem: autotools
+    config-opts:
+      - --disable-debug
+      - --disable-doc
+      - --disable-static
+      - --enable-shared
+      # ffplay is an SDL2 debug player no consumer drives, and shipping it puts
+      # an `ffplay` command on the consuming app's PATH — a behaviour surface
+      # this stack has no reason to add.
+      - --disable-ffplay
+      - --enable-gnutls
+      # GPL + version3 are required by x264, x265 and rubberband.
+      - --enable-gpl
+      - --enable-version3
+      - --enable-libass
+      - --enable-libdav1d
+      - --enable-libfreetype
+      # freetype alone is not enough for the drawtext filter in FFmpeg 7+; it
+      # also needs harfbuzz, and without it drawtext is silently absent.
+      # harfbuzz 11.4.5 is in org.gnome.Sdk//50 and libharfbuzz.so.0 in the
+      # Platform, so this costs nothing and travels with nothing.
+      - --enable-libharfbuzz
+      # ...and fontconfig on top of those two, or drawtext only accepts
+      # fontfile=/abs/path and refuses font=Sans. libass already resolves fonts
+      # this way, and fontconfig is in both the SDK and the Platform.
+      - --enable-libfontconfig
+      - --enable-libmp3lame
+      - --enable-libopus
+      - --enable-librubberband
+      - --enable-libtheora
+      - --enable-libv4l2
+      - --enable-libvorbis
+      - --enable-libvpx
+      - --enable-libwebp
+      - --enable-libx264
+      - --enable-libx265
+      - --enable-libxml2
+      - --enable-vulkan
+      - --enable-encoder=png
+      # Hardware encoders, limited to the two whose userspace Flatpak actually
+      # distributes (see the header). Both dlopen at run time, so a machine
+      # without the matching device simply does not expose them.
+      - --enable-vaapi
+      - --enable-nvenc
+    sources:
+      - type: git
+        url: https://github.com/FFmpeg/FFmpeg.git
+        tag: n9.0
+        commit: 5b9252abfe2fda0ccb71ed45cd7a954cc45d2b6f

@@ -1,0 +1,38 @@
+# LAME, prebuilt for FlatPark apps.
+#
+# libmp3lame is the MP3 encoder ffmpeg links for `-c:a libmp3lame`. Neither
+# runtime ships it, and the runtime's own ffmpeg is built without it, so an app
+# offering MP3 output has to bring its own.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it; ffmpeg-full.yml does. The `lame`/`mp3rtp` command-line front ends are not
+# built: consumers link the library.
+id: org.flatpark.Prebuilt.Lame
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  # .la files record absolute build paths and mislead a downstream libtool link.
+  - "*.la"
+  - /share/doc
+  - /share/man
+
+modules:
+  - name: lame
+    buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+      - --disable-frontend
+    sources:
+      - type: archive
+        url: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+        sha256: ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e

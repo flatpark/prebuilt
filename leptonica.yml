@@ -1,0 +1,38 @@
+# Leptonica, prebuilt for FlatPark apps.
+#
+# Image-processing library. On its own it is a general-purpose toolkit, but the
+# reason it is here is that Tesseract is built on it and links it directly: an
+# app doing OCR needs both, and tesseract.yml consumes this release rather than
+# rebuilding it.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it. The command-line programs are not built — they are a large set of demos and
+# converters that nothing downstream calls. Its image codecs (zlib, libpng,
+# libjpeg, libtiff, libwebp, giflib) come from the runtime.
+id: org.flatpark.Prebuilt.Leptonica
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+
+modules:
+  - name: leptonica
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      - -DBUILD_SHARED_LIBS=ON
+      - -DBUILD_PROG=OFF
+    sources:
+      - type: archive
+        url: https://github.com/DanBloomberg/leptonica/releases/download/1.85.0/leptonica-1.85.0.tar.gz
+        sha256: 3745ae3bf271a6801a2292eead83ac926e3a9bc1bf622e9cd4dd0f3786e17205

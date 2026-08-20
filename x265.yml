@@ -1,0 +1,44 @@
+# x265, prebuilt for FlatPark apps.
+#
+# H.265/HEVC encoder, the counterpart to x264.yml and absent from both runtimes
+# for the same reason. Apps that offer HEVC output have to ship it themselves.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it; ffmpeg-full.yml does. Only the 8-bit depth build is shipped — the 10/12-bit
+# libraries are a separate multilib dance that no FlatPark consumer has needed,
+# and adding them later is a new tag, not a silent change.
+id: org.flatpark.Prebuilt.X265
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - /share/man
+  - /share/doc
+
+modules:
+  - name: x265
+    buildsystem: cmake-ninja
+    # x265's CMakeLists lives in source/, not at the repository root.
+    subdir: source
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      # x265 4.2 still declares cmake_minimum_required below 3.5, which CMake 4
+      # refuses outright.
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+      - -DENABLE_SHARED=ON
+      # The x265 CLI is not what consumers link; ffmpeg drives the library.
+      - -DENABLE_CLI=OFF
+    sources:
+      - type: git
+        url: https://bitbucket.org/multicoreware/x265_git.git
+        tag: "4.2"
+        commit: e7a37608685a1ea61c59342cb19208d688928287

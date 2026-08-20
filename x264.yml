@@ -1,0 +1,39 @@
+# x264, prebuilt for FlatPark apps.
+#
+# H.264/AVC encoder. Neither the GNOME nor the freedesktop runtime ships it —
+# org.freedesktop.Platform.codecs-extra carries a libx264 for the runtime's own
+# ffmpeg, but it is an extension the app cannot link against at build time and
+# cannot rely on being installed. Apps that encode H.264 therefore have to bring
+# their own; this is that copy, built once.
+#
+# Dev-complete (library + headers + pkg-config) so a consumer can build against
+# it — ffmpeg-full.yml does exactly that. Upstream cuts no release tags, so the
+# pin is a bare commit; that is the only thing there is to pin.
+id: org.flatpark.Prebuilt.X264
+runtime: org.gnome.Platform
+runtime-version: "50"
+sdk: org.gnome.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+cleanup:
+  - "*.a"
+  - /share/man
+
+modules:
+  - name: x264
+    buildsystem: simple
+    build-commands:
+      # --libdir so the .so lands in /app/lib rather than a multiarch path, which
+      # is where a consuming app's LD_LIBRARY_PATH entry points.
+      - ./configure --prefix=/app --libdir=/app/lib --disable-cli --enable-shared
+      - make -j$FLATPAK_BUILDER_N_JOBS
+      - make install
+    sources:
+      - type: git
+        url: https://code.videolan.org/videolan/x264.git
+        commit: 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee

@@ -1,0 +1,66 @@
+# MIT krb5, prebuilt as a runtime-only GSSAPI shim for FlatPark apps.
+#
+# Why this exists: some payloads bundle their own Qt, and a Qt built with the
+# GSSAPI feature enabled records a hard DT_NEEDED on libgssapi_krb5.so.2 in
+# libQt6Network. org.freedesktop.Platform//25.08 ships no krb5 at all — not the
+# GSSAPI library, not its dependencies — so the loader fails on libQt6Network
+# and the app never draws a window. The dependency is satisfied at load time
+# whether or not anything ever performs Kerberos authentication.
+# First consumer: com.interactivebrokers.ibkrdesktop (bundled Qt 6.8.3).
+#
+# Scope is deliberately runtime-only, and narrower than that: only the load-time
+# closure of libgssapi_krb5.so.2 is shipped —
+#
+#   libgssapi_krb5.so.2
+#    ├─ libkrb5.so.3
+#    ├─ libk5crypto.so.3
+#    ├─ libcom_err.so.3
+#    └─ libkrb5support.so.0
+#
+# and nothing else. A full `make install` also lays down the KDC and kadmin
+# side (libkdb5, libkadm5srv, libkadm5clnt, libgssrpc, libkrad, libverto), the
+# plugin tree under lib/krb5 (KDC database backends, preauth mechanisms), plus
+# headers, man pages, pkg-config files and translations — none of which a
+# client-side GSSAPI consumer ever opens. Dropping them takes the stack from
+# ~13 MB to ~6.5 MB.
+#
+# This stack is meant to be consumed as extra-data, not as a build-time archive
+# module: the archive then travels over GitHub's bandwidth at install time and
+# never enters FlatPark's own OSTree repository. The tarball carries a bare
+# lib/ so it unpacks under the app's private /app/extra/<stack>/ directory; put
+# that lib/ LAST on the app's LD_LIBRARY_PATH, so the libraries are reachable by
+# soname lookup without shadowing anything else in the sandbox.
+id: org.flatpark.Prebuilt.Krb5Gss
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  no-debuginfo: true
+
+modules:
+  - name: krb5-gss
+    # krb5's configure lives in src/, not at the tarball root.
+    subdir: src
+    config-opts:
+      - --disable-static
+      - --disable-rpath
+      - --localstatedir=/var/lib
+      - --sbindir=${FLATPAK_DEST}/bin
+    post-install:
+      # Keep only the five libraries above (each real .so.X.Y plus its soname
+      # symlink; the unversioned development symlink does not match the glob and
+      # is not wanted), then drop everything `make install` laid down around
+      # them — bin, sbin, include, share, var, lib/pkgconfig and the lib/krb5
+      # plugin tree.
+      - install -d ${FLATPAK_DEST}/lib.keep
+      - for so in libgssapi_krb5.so.2 libkrb5.so.3 libk5crypto.so.3 libcom_err.so.3 libkrb5support.so.0; do cp -a ${FLATPAK_DEST}/lib/$so* ${FLATPAK_DEST}/lib.keep/; done
+      - rm -rf ${FLATPAK_DEST}/lib
+      - mv ${FLATPAK_DEST}/lib.keep ${FLATPAK_DEST}/lib
+      - find ${FLATPAK_DEST} -mindepth 1 -maxdepth 1 ! -name lib -exec rm -rf {} +
+    sources:
+      - type: archive
+        url: https://kerberos.org/dist/krb5/1.22/krb5-1.22.1.tar.gz
+        mirror-urls:
+          - https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.1.tar.gz
+        sha256: 1a8832b8cad923ebbf1394f67e2efcf41e3a49f460285a66e35adec8fa0053af

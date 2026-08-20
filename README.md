@@ -26,6 +26,25 @@ and commit that produced the artifact.
 | `opencv-imgproc` | OpenCV 4.13.0 (core + imgproc), dev-complete (libs + headers + CMake/pkg-config) | `org.freedesktop.Sdk//25.08` | Apps that build against OpenCV |
 | `openssl-1.1-compat` | OpenSSL 1.1.1w shared libraries only (`libssl.so.1.1`, `libcrypto.so.1.1`) — no headers, runtime shim | `org.freedesktop.Sdk//25.08` | Legacy payloads whose bundled runtime predates OpenSSL 3 support (e.g. self-contained .NET 5) — **1.1.1 is EOL, see the manifest header** |
 | `wemeet-screenshare-hook` | libportal 0.9.1 + xuwd1/wemeet-wayland-screenshare `libhook.so` (built against `opencv-imgproc`; OpenCV not shipped but **dlopen'd at runtime**, so the app must also ship `opencv-imgproc`) | `org.freedesktop.Sdk//25.08` | `com.tencent.wemeet` (XWayland screen-share hook) |
+| `krb5-gss` | MIT krb5 1.22.1, the load-time closure of `libgssapi_krb5.so.2` and nothing else (`libkrb5`, `libk5crypto`, `libcom_err`, `libkrb5support`) — no KDC/kadmin libraries, no plugin tree, no headers | `org.freedesktop.Sdk//25.08` | Payloads bundling a Qt built with the GSSAPI feature, whose `libQt6Network` then hard-links `libgssapi_krb5.so.2` — `com.interactivebrokers.ibkrdesktop`. **Consumed as extra-data**, see below |
+
+## Archive module or extra-data
+
+A stack can be consumed either way, and the choice decides where the bytes live:
+
+- **`type: archive` build module** (`ayatana-stack`, `mpv-stack`, `libxdo`,
+  `opencv-imgproc`, `openssl-1.1-compat`, `wemeet-screenshare-hook`) — the tree is
+  copied into `/app` at build time, so it becomes part of the app's OSTree commit
+  and is stored in FlatPark's own repository. Content-addressed storage means a
+  stack shared by many apps is held once; `ayatana-stack` is one object set for
+  thirteen apps.
+- **`type: extra-data`** (`krb5-gss`) — the archive is downloaded from this
+  repository's release at install time and unpacked by the app's `apply_extra`
+  into `/app/extra/<stack>/`. FlatPark's repository holds nothing, and the
+  bandwidth is GitHub's. The consuming wrapper must put `/app/extra/<stack>/lib`
+  on `LD_LIBRARY_PATH`, since that path is not on the loader's default search
+  path. Worth it for a large stack with a single consumer, where content
+  addressing has nothing to deduplicate.
 
 ## Cutting a release
 

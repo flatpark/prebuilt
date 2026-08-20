@@ -6,9 +6,20 @@
 # appear). The driver itself is never shipped here — only the dispatcher, which
 # is the part that has to be present at link time.
 #
+# CAVEAT, read before pinning this: the dispatcher ALONE cannot encode. It
+# enumerates oneVPL implementations at run time and the one that does the work,
+# `libmfx-gen.so`, ships with Intel's media driver — which no Flatpak extension
+# provides. Measured inside a sandbox on an Intel Arc 140V with --device=dri,
+# the hardware QSV exists for: `h264_qsv` fails with "Error creating a MFX
+# session: -9", while `h264_vaapi` encodes successfully through the same
+# /dev/dri/renderD128. So an ffmpeg built --enable-libvpl offers QSV encoders
+# that can never run in a Flatpak; ffmpeg-full.yml deliberately does not enable
+# it. This release exists for a consumer that has its own way to supply the
+# runtime. VAAPI is the path Intel and AMD GPUs actually take here.
+#
 # Dev-complete (library + headers + pkg-config) so a consumer can build against
-# it; ffmpeg-full.yml does. Tests, examples and the example source install are
-# all off: nothing downstream links them.
+# it. Tests, examples and the example source install are all off: nothing
+# downstream links them.
 id: org.flatpark.Prebuilt.Libvpl
 runtime: org.gnome.Platform
 runtime-version: "50"

@@ -30,7 +30,7 @@ modules:
         url: https://launchpad.net/intltool/trunk/0.51.0/+download/intltool-0.51.0.tar.gz
         sha256: 67c74d94196b153b774ab9f89b2fa6c6ba79352407037c8c14d5aeb334e959cd
       - type: patch
-        path: patches/intltool-perl5.26-regex-fixes.patch
+        path: patches/ayatana-stack/intltool-perl5.26-regex-fixes.patch
   - name: libdbusmenu
     buildsystem: autotools
     build-options:
@@ -56,7 +56,7 @@ modules:
         sha256: b9cc4a2acd74509435892823607d966d424bd9ad5d0b00938f27240a1bfa878a
       - type: patch
         paths:
-          - patches/0001-Fix-HAVE_VALGRIND-AM_CONDITIONAL.patch
+          - patches/ayatana-stack/libdbusmenu-0001-Fix-HAVE_VALGRIND-AM_CONDITIONAL.patch
   - name: ayatana-ido
     buildsystem: cmake-ninja
     cleanup:
@@ -75,7 +75,7 @@ modules:
         commit: f968079b09e2310fefc3fc307359025f1c74b3eb
       - type: patch
         paths:
-          - patches/0001-Make-introspection-configurable.patch
+          - patches/ayatana-stack/ayatana-ido-0001-Make-introspection-configurable.patch
   - name: libayatana-indicator
     buildsystem: cmake-ninja
     cleanup:

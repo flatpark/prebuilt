@@ -1,0 +1,150 @@
+# Client libraries for the SQL wire protocols, prebuilt for FlatPark apps.
+#
+# Why this exists: a database GUI links no server, only the vendor client
+# libraries — and the shared runtimes ship none of them. org.freedesktop.Platform
+# //25.08, and therefore every runtime built on it (org.gnome.Platform//50 and
+# the current org.kde.Platform branches), carries libsqlite3 and nothing else:
+# no libmariadb, no libpq, no libsybdb. A payload that speaks MySQL, PostgreSQL
+# or SQL Server has to bring them along.
+#
+# First consumer: com.heidisql.HeidiSQL. HeidiSQL is a Lazarus/FreePascal app
+# whose driver picker enumerates the client libraries by parsing `/sbin/ldconfig
+# -p` and dlopen-ing the paths it finds (TConnectionParameters.GetLibraries in
+# source/dbconnection.pas), so the libraries only have to be *findable* — they
+# are not DT_NEEDED and no header, pkg-config file or CMake package is needed.
+# The stack is runtime-only for that reason:
+#
+#   libmariadb.so.3   MariaDB / MySQL / Percona   + lib/mariadb/plugin/*
+#   libpq.so.5        PostgreSQL
+#   libsybdb.so.5     Microsoft SQL Server (FreeTDS's DB-Library)
+#   bin/sshpass       non-interactive password feed for an ssh(1) tunnel
+#
+# Built against org.freedesktop.Sdk//25.08 rather than a KDE or GNOME SDK even
+# though the first consumer is a KDE-runtime app: nothing here links Qt or GTK —
+# only OpenSSL, zlib and libc, which all three families inherit unchanged from
+# the freedesktop base — so one archive serves consumers on any of them.
+#
+# sshpass is a program, not a library, and is here because it belongs to the same
+# feature: HeidiSQL tunnels a connection by spawning ssh(1) (present in the
+# runtimes) and, when the session stores an SSH *password* rather than a key,
+# feeds it through sshpass (absent). Shipping it next to the client libraries
+# keeps "what a DB client needs to reach a server" in one pinned archive.
+#
+# Consume this as extra-data, not as a build-time archive module: with a single
+# consumer, content-addressed storage in FlatPark's repository has nothing to
+# deduplicate, and as extra-data the bytes travel over GitHub's bandwidth at
+# install time instead. The tarball carries bare lib/ and bin/ trees, so it
+# unpacks under the app's private /app/extra/<stack>/.
+#
+# Two notes for the consuming wrapper:
+#   * put lib/ LAST on LD_LIBRARY_PATH, so nothing else in the sandbox is
+#     shadowed — and, for an ldconfig-based picker like HeidiSQL's, also list the
+#     directory in /app/etc/ld.so.conf (which the runtime's /etc/ld.so.conf
+#     already includes) so it lands in the cache Flatpak regenerates at startup;
+#   * export MARIADB_PLUGIN_DIR=<stack>/lib/mariadb/plugin. libmariadb's plugin
+#     directory is compiled in as ${prefix}/lib/mariadb/plugin, which does not
+#     exist under /app/extra; without the override the authentication plugins
+#     (caching_sha2_password for MySQL 8, dialog, mysql_clear_password) cannot be
+#     loaded and those logins fail.
+id: org.flatpark.Prebuilt.SqlClients
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside every library in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+
+modules:
+  # MariaDB Connector/C — libmariadb.so.3, the client library for MariaDB, MySQL
+  # and Percona Server.
+  - name: mariadb-connector-c
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      # Upstream's default is lib/mariadb, which is not on the loader's search
+      # path and would leave the library invisible to an ldconfig-based picker.
+      - -DINSTALL_LIBDIR=lib
+      - -DINSTALL_PLUGINDIR=lib/mariadb/plugin
+      - -DINSTALL_BINDIR=bin
+      - -DINSTALL_INCLUDEDIR=include
+      - -DWITH_UNIT_TESTS=OFF
+      # OpenSSL 3 and zlib come from the runtime; the bundled zlib copy is not
+      # needed. WITH_CURL is only used by the AWS IAM authentication plugin.
+      - -DWITH_SSL=OPENSSL
+      - -DWITH_EXTERNAL_ZLIB=ON
+      - -DWITH_CURL=OFF
+    sources:
+      - type: archive
+        url: https://archive.mariadb.org/connector-c-3.4.9/mariadb-connector-c-3.4.9-src.tar.gz
+        sha256: a84bba97e59b6a322637a189964d4fd72bd8d92f2d22a9f8d6a5f0657c821e97
+
+  # PostgreSQL — libpq.so.5 only. The full tree is configured (libpq's makefile
+  # needs the generated headers under src/), but only src/interfaces/libpq and
+  # its prerequisites are built and installed, which keeps a 22 MB source
+  # tarball down to one client library. Every optional dependency is off: none
+  # of readline, ICU, zlib, zstd or lz4 is needed to open a connection, and each
+  # would add a link-time dependency to carry.
+  - name: libpq
+    buildsystem: simple
+    build-commands:
+      - ./configure --prefix=/app --without-readline --without-icu --without-zlib
+        --without-zstd --without-lz4 --with-openssl
+      - make -C src/interfaces/libpq -j${FLATPAK_BUILDER_N_JOBS:-1}
+      - make -C src/interfaces/libpq install
+    sources:
+      - type: archive
+        url: https://ftp.postgresql.org/pub/source/v18.6/postgresql-18.6.tar.bz2
+        sha256: 555610c24d53e4316da5b7d3fc25c279d96856d5e0e23ee308c328c5fa881d9f
+
+  # FreeTDS — libsybdb.so.5, the DB-Library implementation of the TDS protocol.
+  # This is the route to Microsoft SQL Server for clients that used to reach it
+  # through ADO on Windows. ODBC is off: nothing here drives an ODBC manager.
+  - name: freetds
+    buildsystem: autotools
+    config-opts:
+      - --disable-static
+      - --disable-odbc
+      - --with-openssl
+    sources:
+      - type: archive
+        url: https://www.freetds.org/files/stable/freetds-1.5.9.tar.gz
+        sha256: 955738fde3c3aad226a40be94702fbb21f16ab79fccc8b7ebeb954c4b3d0f8d4
+
+  # sshpass — feeds a stored password to ssh(1)'s prompt from a pipe. Key-based
+  # tunnels never reach it.
+  - name: sshpass
+    buildsystem: autotools
+    sources:
+      - type: archive
+        url: https://downloads.sourceforge.net/project/sshpass/sshpass/1.10/sshpass-1.10.tar.gz
+        sha256: ad1106c203cbb56185ca3bad8c6ccafca3b4064696194da879f81c8d7bdfeeda
+
+  # Keep the four artifacts and the plugin tree; drop everything else the four
+  # `make install`s laid down — headers, pkg-config and CMake files, the FreeTDS
+  # command-line tools (tsql, freebcp, datacopy, ...), mariadb_config, man pages
+  # and locale data. A consumer dlopens these libraries by path; nothing links
+  # against them at build time, so the development half has no audience.
+  - name: trim
+    buildsystem: simple
+    build-commands:
+      - |
+        set -eu
+        cd "${FLATPAK_DEST}"
+        install -d .keep/lib .keep/bin
+        cp -a lib/libmariadb.so* lib/libpq.so* lib/libsybdb.so* .keep/lib/
+        cp -a lib/mariadb .keep/lib/
+        cp -a bin/sshpass .keep/bin/
+        find . -mindepth 1 -maxdepth 1 ! -name .keep -exec rm -rf {} +
+        mv .keep/lib lib
+        mv .keep/bin bin
+        rmdir .keep
+        # Fail the build rather than ship an archive missing a library.
+        for f in lib/libmariadb.so.3 lib/libpq.so.5 lib/libsybdb.so.5 bin/sshpass; do
+            [ -e "$f" ] || { echo "trim: missing $f" >&2; exit 1; }
+        done
+        [ -d lib/mariadb/plugin ] || { echo "trim: missing lib/mariadb/plugin" >&2; exit 1; }
+    sources: []

@@ -43,6 +43,7 @@ rebuilding from the manifest at the tag, not by shipping them to every user.
 | `tesseract` | Tesseract 5.5.1, `libtesseract.so.5` + the `tesseract` CLI + `share/tessdata` presets. No leptonica, no language data, no training tools | `org.gnome.Sdk//50` | OCR — `dk.nikse.subtitleedit`. Stage `.traineddata` into its `share/tessdata` and point `TESSDATA_PREFIX` there |
 | `uchardet` | uchardet 0.0.8, `libuchardet.so.0`, dev-complete; no CLI | `org.gnome.Sdk//50` | Guessing the encoding of text files an app did not write, e.g. subtitle files |
 | `sevenzip` | 7-Zip 25.01 `7zr`, one dependency-free binary; .7z only | `org.gnome.Sdk//50` | Apps unpacking .7z downloads at run time |
+| `sql-clients` | MariaDB Connector/C 3.4.9 (`libmariadb.so.3` + its authentication plugins), PostgreSQL 18.6 `libpq.so.5`, FreeTDS 1.5.9 `libsybdb.so.5`, sshpass 1.10; runtime-only — no headers, no CLIs beyond sshpass | `org.freedesktop.Sdk//25.08` | Database clients that reach their driver at run time rather than linking it — `com.heidisql.HeidiSQL`, which enumerates them by parsing `ldconfig -p`. The runtimes ship `libsqlite3` and nothing else. **Consumed as extra-data**, see below |
 
 ## Archive module or extra-data
 
@@ -55,7 +56,7 @@ A stack can be consumed either way, and the choice decides where the bytes live:
   held once; `ayatana-stack` is one object set for thirteen apps.
 - **`type: extra-data`** (`krb5-gss`, `openssl-1.1-compat`, `opencv-imgproc`, and the
   ffmpeg and OCR stacks: `x264`, `x265`, `lame`, `rubberband`, `libass`,
-  `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`) —
+  `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`, `sql-clients`) —
   the archive is downloaded from this repository's release at install time and
   unpacked by the app's `apply_extra`
   into `/app/extra/<stack>/`. FlatPark's repository holds nothing, and the

@@ -1,0 +1,148 @@
+# appimage-tools — extract an AppImage without libfuse, prebuilt for FlatPark apps.
+#
+# Why this exists. A large class of Linux GUI apps ship *only* an AppImage: no
+# .deb, no .rpm, no plain tarball. FlatPark repackages the vendor's own release
+# unmodified as extra-data, and an AppImage is a self-contained payload like any
+# other — an ELF stub with a SquashFS image appended — so it is a fine thing to
+# repackage. The obstacle is purely mechanical: the normal way to open one is to
+# run it, and its embedded runtime mounts the SquashFS through FUSE, which no
+# FlatPark runtime provides (no libfuse, no /dev/fuse in the apply_extra
+# sandbox). The AppImage never has to be *run* to get at its contents, though —
+# the appended filesystem can be unpacked directly.
+#
+# This stack is the two tools that does that, and nothing else:
+#
+#   bin/appimage-offset  — prints the byte offset of the appended SquashFS.
+#                          For a type-2 AppImage that is the end of the ELF:
+#                          e_shoff + e_shentsize * e_shnum, the same value the
+#                          AppImage runtime's own --appimage-offset reports.
+#   bin/unsquashfs       — squashfs-tools 4.6.1, built with gzip + xz + lz4 +
+#                          zstd decompressors (every compressor appimagetool
+#                          has ever defaulted to; LZO is deliberately omitted,
+#                          it needs liblzo2 which the runtime lacks and which
+#                          essentially no AppImage uses). `unsquashfs -o
+#                          $(appimage-offset FILE) -d DEST FILE` writes the
+#                          AppDir tree.
+#
+# Consume it as **extra-data**, fetched next to the app's own AppImage and
+# unpacked by the app's apply_extra before it runs these two tools. It must be
+# extra-data, not a build-time archive module: apply_extra in a system-wide
+# install runs in a sandbox that binds only the runtime's /usr and the app's
+# /app/extra — never the built /app — so a tool staged at /app/bin is not on
+# PATH there (this is also what scripts/check-apply-extra.sh reproduces in CI).
+# Downloaded into /app/extra it is reachable in every install mode.
+#
+# Everything unsquashfs links — libz, liblzma, liblz4, libzstd, libpthread,
+# libm, libc — is in org.freedesktop.Platform//25.08 and therefore in every
+# runtime built on it (org.gnome.Platform//50, the org.kde.Platform branches),
+# so one archive serves an AppImage app on any of them. Not app-specific: the
+# name carries no app, the same way ayatana-stack and libxdo do not.
+id: org.flatpark.Prebuilt.AppimageTools
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside the binary in the archive. Strip explicitly.
+  # A consumer that needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+
+modules:
+  - name: squashfs-tools
+    buildsystem: simple
+    subdir: squashfs-tools
+    build-commands:
+      # `unsquashfs` only — not mksquashfs, and not the FUSE-based sqfs mount
+      # helpers. GZIP is the historical appimagetool default; ZSTD is the modern
+      # one; XZ and LZ4 cover the rest. XATTR_SUPPORT off: apply_extra runs with
+      # all capabilities dropped and cannot restore xattrs anyway.
+      - make -j${FLATPAK_BUILDER_N_JOBS:-1} GZIP_SUPPORT=1 XZ_SUPPORT=1
+        LZO_SUPPORT=0 LZ4_SUPPORT=1 ZSTD_SUPPORT=1 XATTR_SUPPORT=0 unsquashfs
+      - install -Dm755 unsquashfs /app/bin/unsquashfs
+    sources:
+      - type: git
+        url: https://github.com/plougher/squashfs-tools.git
+        tag: "4.6.1"
+        commit: d8cb82d9840330f9344ec37b992595b5d7b44184
+
+  - name: appimage-offset
+    buildsystem: simple
+    build-commands:
+      - cc -O2 -Wall -o /app/bin/appimage-offset appimage-offset.c
+    sources:
+      - type: inline
+        dest-filename: appimage-offset.c
+        contents: |
+          /* appimage-offset FILE
+           *
+           * Print the byte offset at which an AppImage's appended SquashFS
+           * filesystem begins, so `unsquashfs -o` can extract it without the
+           * AppImage ever being executed or FUSE-mounted.
+           *
+           * A type-2 AppImage is an ordinary ELF64 (the runtime stub) with the
+           * SquashFS image concatenated after it. The image therefore starts at
+           * the end of the ELF, which for these stubs is where the section
+           * header table ends: e_shoff + e_shentsize * e_shnum. This is exactly
+           * what libappimage's appimage_get_elf_size() / the runtime's own
+           * `--appimage-offset` compute.
+           *
+           * x86_64 only: ELF64, two's-complement little-endian. That covers
+           * every AppImage FlatPark would package; anything else exits nonzero
+           * and the caller stops.
+           */
+          #include <stdio.h>
+          #include <stdint.h>
+          #include <string.h>
+
+          int main(int argc, char **argv) {
+              if (argc != 2) {
+                  fprintf(stderr, "usage: appimage-offset FILE\n");
+                  return 2;
+              }
+              FILE *f = fopen(argv[1], "rb");
+              if (!f) { perror("appimage-offset: open"); return 1; }
+
+              unsigned char e[64];
+              if (fread(e, 1, sizeof e, f) != sizeof e) {
+                  fprintf(stderr, "appimage-offset: %s: short read on ELF header\n", argv[1]);
+                  fclose(f);
+                  return 1;
+              }
+              fclose(f);
+
+              if (memcmp(e, "\177ELF", 4) != 0) {
+                  fprintf(stderr, "appimage-offset: %s: not an ELF (type-2 AppImage expected)\n", argv[1]);
+                  return 1;
+              }
+              if (e[4] != 2 /* ELFCLASS64 */ || e[5] != 1 /* ELFDATA2LSB */) {
+                  fprintf(stderr, "appimage-offset: %s: not little-endian ELF64\n", argv[1]);
+                  return 1;
+              }
+
+              uint64_t e_shoff = 0;
+              for (int i = 7; i >= 0; i--) e_shoff = (e_shoff << 8) | e[0x28 + i];
+              uint32_t e_shentsize = (uint32_t)e[0x3a] | ((uint32_t)e[0x3b] << 8);
+              uint32_t e_shnum     = (uint32_t)e[0x3c] | ((uint32_t)e[0x3d] << 8);
+
+              uint64_t off = e_shoff + (uint64_t)e_shentsize * e_shnum;
+              printf("%llu\n", (unsigned long long)off);
+              return 0;
+          }
+
+  # Keep only the two binaries; drop the headers, man pages and the sqfstar/
+  # sqfscat symlinks squashfs-tools' `install` would otherwise leave.
+  - name: trim
+    buildsystem: simple
+    build-commands:
+      - |
+        set -eu
+        cd "${FLATPAK_DEST}"
+        find . -mindepth 1 -maxdepth 1 ! -name bin -exec rm -rf {} +
+        cd bin
+        find . -mindepth 1 ! -name unsquashfs ! -name appimage-offset -exec rm -rf {} +
+        for f in unsquashfs appimage-offset; do
+            [ -x "$f" ] || { echo "trim: missing bin/$f" >&2; exit 1; }
+        done
+    sources: []

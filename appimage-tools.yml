@@ -33,13 +33,13 @@
 # Downloaded into /app/extra it is reachable in every install mode.
 #
 # Everything unsquashfs links — libz, liblzma, liblz4, libzstd, libpthread,
-# libm, libc — is in org.freedesktop.Platform//25.08 and therefore in every
+# libm, libc — is in org.freedesktop.Platform//26.08 and therefore in every
 # runtime built on it (org.gnome.Platform//50, the org.kde.Platform branches),
 # so one archive serves an AppImage app on any of them. Not app-specific: the
 # name carries no app, the same way ayatana-stack and libxdo do not.
 id: org.flatpark.Prebuilt.AppimageTools
 runtime: org.freedesktop.Platform
-runtime-version: "25.08"
+runtime-version: "26.08"
 sdk: org.freedesktop.Sdk
 command: /usr/bin/true
 build-options:

@@ -42,8 +42,8 @@ modules:
       - cp -a ./. /app/
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/opencv-imgproc-v2/opencv-imgproc-opencv-imgproc-v2-fd-25.08-x86_64.tar.xz
-        sha256: 6d211fcdfe97026f65433e24f261d284c0c5da2ef55de7ec4b88dfcce407ad2d
+        url: https://github.com/flatpark/prebuilt/releases/download/opencv-imgproc-v3/opencv-imgproc-opencv-imgproc-v3-fd-26.08-x86_64.tar.xz
+        sha256: 3b5a7b1245bf6606af1c991af506402403c2011b47f42df1bb2d6f551513ce9b
 
   - name: libportal
     buildsystem: meson

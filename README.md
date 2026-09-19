@@ -26,9 +26,9 @@ rebuilding from the manifest at the tag, not by shipping them to every user.
 
 | Stack | Contents | Built against | Used by |
 |---|---|---|---|
-| `ayatana-stack` | libdbusmenu 16.04.0, ayatana-ido 0.10.4, libayatana-indicator 0.9.4, libayatana-appindicator 0.5.94 | `org.gnome.Sdk//50` | Tauri apps needing a tray icon |
+| `ayatana-stack` | libdbusmenu 16.04.0, ayatana-ido 0.10.4, libayatana-indicator 0.9.4, libayatana-appindicator 0.5.94 | `org.gnome.Sdk//51` | Tauri apps needing a tray icon |
 | `mpv-stack` | libass 0.17.3, libplacebo v7.360.1, mpv v0.40.0 (`libmpv.so.2` **and** the `mpv` command-line player) | `org.gnome.Sdk//50` | Apps that play video with mpv — `dk.nikse.subtitleedit` (dlopens libmpv for the video preview), `site.harbor.Harbor.Beta` (embeds libmpv, and spawns `mpv` for thumbnails, clip encoding and multiview) |
-| `libxdo` | libxdo from xdotool 3.20211022.1, shared library only (soname `libxdo.so.3`) — no headers, no `xdotool` CLI | `org.gnome.Sdk//50` | Apps that link libxdo for X11 input automation (the enigo crate), e.g. `io.github.thewh1teagle.vibe` |
+| `libxdo` | libxdo from xdotool 3.20211022.1, shared library only (soname `libxdo.so.3`) — no headers, no `xdotool` CLI | `org.gnome.Sdk//51` | Apps that link libxdo for X11 input automation (the enigo crate), e.g. `io.github.thewh1teagle.vibe` |
 | `opencv-imgproc` | OpenCV 4.13.0 (core + imgproc), dev-complete (libs + headers + CMake/pkg-config); no `share/opencv4` cascade data | `org.freedesktop.Sdk//26.08` | `wemeet-screenshare-hook` builds against it; `com.tencent.wemeet` ships it as **extra-data** because the hook `dlopen`s OpenCV by unversioned soname |
 | `openssl-1.1-compat` | OpenSSL 1.1.1w shared libraries only (`libssl.so.1.1`, `libcrypto.so.1.1`) — no headers, runtime shim | `org.freedesktop.Sdk//26.08` | Legacy payloads whose bundled runtime predates OpenSSL 3 support (e.g. self-contained .NET 5) — **1.1.1 is EOL, see the manifest header** |
 | `wemeet-screenshare-hook` | libportal 0.9.1 + xuwd1/wemeet-wayland-screenshare `libhook.so` (built against `opencv-imgproc`; OpenCV not shipped but **dlopen'd at runtime**, so the app must also ship `opencv-imgproc`) | `org.freedesktop.Sdk//26.08` | `com.tencent.wemeet` (XWayland screen-share hook) |
@@ -54,7 +54,7 @@ A stack can be consumed either way, and the choice decides where the bytes live:
   `wemeet-screenshare-hook`) — the tree is copied into `/app` at build time, so
   it becomes part of the app's OSTree commit and is stored in FlatPark's own
   repository. Content-addressed storage means a stack shared by many apps is
-  held once; `ayatana-stack` is one object set for thirteen apps.
+  held once; `ayatana-stack` is one object set for fourteen apps.
 - **`type: extra-data`** (`krb5-gss`, `openssl-1.1-compat`, `opencv-imgproc`, and the
   ffmpeg and OCR stacks: `x264`, `x265`, `lame`, `rubberband`, `libass`,
   `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`, `sql-clients`,
@@ -74,7 +74,7 @@ A stack can be consumed either way, and the choice decides where the bytes live:
 Prefer extra-data. FlatPark's repository is meant to hold app metadata, not
 built bytes, and a stack with one or two consumers gives content-addressed
 storage nothing to deduplicate anyway. The archive module remains the right
-answer where many apps share one stack (`ayatana-stack`, thirteen consumers):
+answer where many apps share one stack (`ayatana-stack`, fourteen consumers):
 there the repository holds one object set, while extra-data would put a private
 copy on every user's disk and re-download it per app.
 
@@ -83,7 +83,16 @@ copy on every user's disk and re-download it per app.
 Run the `release` workflow (workflow_dispatch) with a tag (e.g. `ayatana-v1`,
 `opencv-imgproc-v1`) and the manifest to build. Rebuild whenever the target
 runtime major bumps or a stack component is updated; consuming manifests pin the
-archive by sha256 and migrate explicitly.
+archive by sha256 and migrate explicitly. Every stack gets re-cut on a runtime
+major bump, because the artifact name carries the base it was built against and a
+consumer should never pin one that names a different base than it runs on. Measure
+first anyway, because the measurement is what tells you how much work the re-cut
+is: compare the stack's `DT_NEEDED` closure against the new runtime, and a stack
+that lost a soname there may need a component version bump before it will build at
+all. Going from the freedesktop 25.08 base to 26.08, `ayatana-stack` and `libxdo`
+came out with the same sonames in and out, while `mpv-stack` lost the whole
+`libav*` generation — and mpv v0.40.0 then failed to compile against the ffmpeg 8
+in the new base — and `ffmpeg-full` lost `libvpx.so.11`.
 
 Some stacks build against another stack's release (e.g. `wemeet-screenshare-hook`
 consumes `opencv-imgproc` for OpenCV headers): cut the dependency's release

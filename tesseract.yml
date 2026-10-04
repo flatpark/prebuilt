@@ -22,7 +22,7 @@
 # The training tools are not built — they are for producing that data, not using it.
 id: org.flatpark.Prebuilt.Tesseract
 runtime: org.gnome.Platform
-runtime-version: "50"
+runtime-version: "51"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:

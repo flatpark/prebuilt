@@ -44,12 +44,12 @@
 # apps that only wanted the encoder.
 #
 # Everything else ffmpeg links here — gnutls, dav1d, freetype, opus, theora,
-# v4l2, vorbis, vpx, webp, xml2, vulkan — is present in both org.gnome.Sdk//50
-# and org.gnome.Platform//50, so it resolves against the runtime and travels
+# v4l2, vorbis, vpx, webp, xml2, vulkan — is present in both org.gnome.Sdk//51
+# and org.gnome.Platform//51, so it resolves against the runtime and travels
 # with nothing.
 id: org.flatpark.Prebuilt.FfmpegFull
 runtime: org.gnome.Platform
-runtime-version: "50"
+runtime-version: "51"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:
@@ -164,7 +164,7 @@ modules:
       - --enable-libfreetype
       # freetype alone is not enough for the drawtext filter in FFmpeg 7+; it
       # also needs harfbuzz, and without it drawtext is silently absent.
-      # harfbuzz 11.4.5 is in org.gnome.Sdk//50 and libharfbuzz.so.0 in the
+      # harfbuzz 14.3.1 is in org.gnome.Sdk//51 and libharfbuzz.so.0 in the
       # Platform, so this costs nothing and travels with nothing.
       - --enable-libharfbuzz
       # ...and fontconfig on top of those two, or drawtext only accepts

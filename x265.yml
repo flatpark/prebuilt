@@ -9,7 +9,7 @@
 # and adding them later is a new tag, not a silent change.
 id: org.flatpark.Prebuilt.X265
 runtime: org.gnome.Platform
-runtime-version: "50"
+runtime-version: "51"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:

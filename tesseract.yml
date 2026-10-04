@@ -6,7 +6,7 @@
 #
 # Leptonica is needed at BUILD time (headers, and libtesseract links it) and at
 # RUNTIME (that DT_NEEDED does not go away), but it is NOT shipped in this
-# archive: it is its own release, and a consuming app pins leptonica-v1 as well
+# archive: it is its own release, and a consuming app pins leptonica-v2 as well
 # and puts both lib/ directories on LD_LIBRARY_PATH. Same split as
 # wemeet-screenshare-hook and opencv-imgproc. Keeping one leptonica per app
 # rather than one per dependent stack is the whole point of releasing it
@@ -22,7 +22,7 @@
 # The training tools are not built — they are for producing that data, not using it.
 id: org.flatpark.Prebuilt.Tesseract
 runtime: org.gnome.Platform
-runtime-version: "50"
+runtime-version: "51"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:
@@ -54,8 +54,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/leptonica-v1/leptonica-leptonica-v1-gnome-50-x86_64.tar.xz
-        sha256: 150639275c0b5487d530289610a62f9626e9e74c51aa45cba865461937a7bead
+        url: https://github.com/flatpark/prebuilt/releases/download/leptonica-v2/leptonica-leptonica-v2-gnome-51-x86_64.tar.xz
+        sha256: c031417db8170f8e2553cab28d674cd78bd86056e53ae423af7fdd1da6822340
 
   - name: tesseract
     buildsystem: cmake-ninja

@@ -21,7 +21,7 @@
 # module's .pc file does not hide it from the module built after it.
 id: org.flatpark.Prebuilt.MpvStack
 runtime: org.gnome.Platform
-runtime-version: "50"
+runtime-version: "51"
 sdk: org.gnome.Sdk
 command: /usr/bin/true
 build-options:
@@ -87,5 +87,5 @@ modules:
     sources:
       - type: git
         url: https://github.com/mpv-player/mpv.git
-        tag: v0.40.0
-        commit: e48ac7ce08462f5e33af6ef9deeac6fa87eef01e
+        tag: v0.41.0
+        commit: 41f6a645068483470267271e1d09966ca3b9f413

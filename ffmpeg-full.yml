@@ -89,8 +89,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/x264-v1/x264-x264-v1-gnome-50-x86_64.tar.xz
-        sha256: f6d5ecf8620a60164d191aeb83ae9ba371e17fb0b3f217cce3d371f260c5f63f
+        url: https://github.com/flatpark/prebuilt/releases/download/x264-v2/x264-x264-v2-gnome-51-x86_64.tar.xz
+        sha256: 31f63c4cc872a8cfb07354cf9b648d0949474f498e447c13d8d43ad4695a9b16
 
   - name: x265
     buildsystem: simple
@@ -102,8 +102,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/x265-v1/x265-x265-v1-gnome-50-x86_64.tar.xz
-        sha256: 0e11378f93862669a832cfb58ae016d039aa65d2acbb8c64fc2a5a9db41a337e
+        url: https://github.com/flatpark/prebuilt/releases/download/x265-v2/x265-x265-v2-gnome-51-x86_64.tar.xz
+        sha256: 2d81543116406f447e9d551f8bb88f80ddcde07471b5da99dd30047e15d32a60
 
   - name: lame
     buildsystem: simple
@@ -115,8 +115,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/lame-v1/lame-lame-v1-gnome-50-x86_64.tar.xz
-        sha256: cf65e7f57f5532f692ed7107af0cafb36afb2277f31c7cb749da206f56f0b396
+        url: https://github.com/flatpark/prebuilt/releases/download/lame-v2/lame-lame-v2-gnome-51-x86_64.tar.xz
+        sha256: b915c4bba401299d7424c5c66ef0bff8da779a4455b10aedd0af45424271ec67
 
   - name: rubberband
     buildsystem: simple
@@ -128,8 +128,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/rubberband-v1/rubberband-rubberband-v1-gnome-50-x86_64.tar.xz
-        sha256: 8f88a7640b9eba33cba667d14f72b1261934e28fa6ba9dfbaa1396eac0c63f5f
+        url: https://github.com/flatpark/prebuilt/releases/download/rubberband-v2/rubberband-rubberband-v2-gnome-51-x86_64.tar.xz
+        sha256: ec3673aa6d901047aaeaf4911253ec359bb6c5202cb7adfdd3a183c7e8814237
 
   - name: libass
     buildsystem: simple
@@ -141,8 +141,8 @@ modules:
       - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/libass-v1/libass-libass-v1-gnome-50-x86_64.tar.xz
-        sha256: 2b246bd7d9f658b0678e366c8196d40daf1088433daeab9a01b06c15884b375d
+        url: https://github.com/flatpark/prebuilt/releases/download/libass-v2/libass-libass-v2-gnome-51-x86_64.tar.xz
+        sha256: 2319d0b986c80e07ea263e37b3a843360d31e064b99325428dafbee9795bf9a6
 
   - name: ffmpeg
     buildsystem: autotools

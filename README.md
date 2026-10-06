@@ -44,6 +44,7 @@ rebuilding from the manifest at the tag, not by shipping them to every user.
 | `uchardet` | uchardet 0.0.8, `libuchardet.so.0`, dev-complete; no CLI | `org.gnome.Sdk//51` | Guessing the encoding of text files an app did not write, e.g. subtitle files |
 | `sevenzip` | 7-Zip 25.01 `7zr`, one dependency-free binary; .7z only | `org.gnome.Sdk//51` | Apps unpacking .7z downloads at run time |
 | `sql-clients` | MariaDB Connector/C 3.4.9 (`libmariadb.so.3` + its authentication plugins), PostgreSQL 18.6 `libpq.so.5`, FreeTDS 1.5.9 `libsybdb.so.5`, sshpass 1.10; runtime-only — no headers, no CLIs beyond sshpass | `org.freedesktop.Sdk//25.08` | Database clients that reach their driver at run time rather than linking it — `com.heidisql.HeidiSQL`, which enumerates them by parsing `ldconfig -p`. The runtimes ship `libsqlite3` and nothing else. **Consumed as extra-data**, see below |
+| `poppler-glib` | Poppler 26.10.0, `libpoppler-glib.so.8` + the `libpoppler.so` it links; runtime-only — no headers, no utilities, no Qt/C++ bindings; libcurl, gpgme and NSS backends off | `org.gnome.Sdk//51` | Payloads linking the Poppler GLib binding — `io.github.lgse.Strata`. **Consumed as extra-data**, see below |
 | `appimage-tools` | `appimage-offset` (prints the appended-SquashFS byte offset from the ELF header) + `unsquashfs` from squashfs-tools 4.6.1 (gzip + xz + lz4 + zstd; no LZO). Two binaries, nothing else | `org.freedesktop.Sdk//26.08` | Repackaging an AppImage-only upstream: `apply_extra` runs `unsquashfs -o $(appimage-offset FILE) -d DEST FILE` to unpack the AppDir with no libfuse and no `/dev/fuse`. Links only libz/lzma/lz4/zstd/pthread/m/c, so it runs under any freedesktop-based runtime. **Consumed as extra-data**, see below |
 
 ## Archive module or extra-data
@@ -58,7 +59,7 @@ A stack can be consumed either way, and the choice decides where the bytes live:
 - **`type: extra-data`** (`krb5-gss`, `openssl-1.1-compat`, `opencv-imgproc`, and the
   ffmpeg and OCR stacks: `x264`, `x265`, `lame`, `rubberband`, `libass`,
   `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`, `sql-clients`,
-  `appimage-tools`) —
+  `appimage-tools`, `poppler-glib`) —
   the archive is downloaded from this repository's release at install time and
   unpacked by the app's `apply_extra`
   into `/app/extra/<stack>/`. FlatPark's repository holds nothing, and the

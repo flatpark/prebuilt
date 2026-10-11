@@ -9,15 +9,35 @@ on:
         description: "Manifest file to build"
         required: true
         default: ayatana-stack.yml
+      arch:
+        description: "Architecture to build (native runner per arch)"
+        required: true
+        type: choice
+        options: [x86_64, aarch64]
+        default: x86_64
 
 permissions:
   contents: write
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # Each arch builds natively. The arm image takes apt from ports.ubuntu.com.
+    runs-on: ${{ inputs.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
+
+      # A tag that already has a release is being built for another arch: build
+      # the manifest exactly as tagged, and add the archive to that release.
+      - name: Existing release?
+        id: rel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ inputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=1" >> "$GITHUB_OUTPUT"
+            git fetch --depth=1 origin "refs/tags/${{ inputs.tag }}:refs/tags/${{ inputs.tag }}"
+            git checkout --quiet "${{ inputs.tag }}"
+          fi
 
       - name: Install flatpak-builder
         run: |
@@ -29,6 +49,8 @@ jobs:
       # without per-stack inputs.
       - name: Parse manifest
         id: m
+        env:
+          ARCH: ${{ inputs.arch }}
         run: |
           set -euo pipefail
           python3 - "${{ inputs.manifest }}" >> "$GITHUB_OUTPUT" <<'PY'
@@ -46,7 +68,7 @@ jobs:
           print(f"rtv={rtv}")
           print(f"sdk={sdk}")
           print(f"stackdir={stackdir}")
-          print(f"slug={plat}-{rtv}-x86_64")
+          print(f"slug={plat}-{rtv}-{os.environ['ARCH']}")
           PY
 
       - name: Install runtime + SDK
@@ -76,6 +98,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          if [ "${{ steps.rel.outputs.exists }}" = 1 ]; then
+            gh release upload "${{ inputs.tag }}" \
+              "${{ steps.pack.outputs.name }}" \
+              "${{ steps.pack.outputs.name }}.sha256"
+            notes="$(gh release view "${{ inputs.tag }}" --json body --jq .body)"
+            gh release edit "${{ inputs.tag }}" --notes "$notes
+
+          ${{ inputs.arch }}: built from ${{ inputs.manifest }} at this tag by workflow run ${{ github.run_id }}."
+            exit 0
+          fi
           gh release create "${{ inputs.tag }}" \
             "${{ steps.pack.outputs.name }}" \
             "${{ steps.pack.outputs.name }}.sha256" \

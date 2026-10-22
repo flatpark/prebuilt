@@ -15,9 +15,13 @@
 # preference. Both are two-layer: ffmpeg links a dispatcher (libvpl for QSV) or
 # dlopens a vendor library (libamfrt64.so.1 for AMF), and the layer that actually
 # encodes ships with the vendor's userspace — `libmfx-gen.so` from
-# intel-media-driver, or AMD's proprietary driver. Flatpak has no extension for
-# either, so neither can ever be present in a sandbox. Measured on an Intel
-# Arc 140V, the hardware QSV exists for, with --device=dri:
+# intel-media-driver, or AMD's AMF runtime. Neither reaches a sandbox on this
+# runtime. For AMF that is a GNOME 51 gap: freedesktop 26.08 declares an
+# `org.freedesktop.Platform.amd` extension point that Flathub's
+# org.freedesktop.Platform.amd.amf (2026-09) mounts on amdgpu hosts, but
+# org.gnome.Platform//51 does not carry it, so nothing mounts. Re-check if this
+# stack moves to a freedesktop base. Measured on an Intel Arc 140V, the hardware
+# QSV exists for, with --device=dri:
 #
 #   h264_vaapi  encode succeeded (exit 0)
 #   h264_qsv    Error creating a MFX session: -9   (dispatcher found no runtime)
@@ -35,13 +39,14 @@
 # runtime is absent" — so the entries would come back to the user's dropdown and
 # fail at encode time, which is the bug that probe was added to fix.
 #
-# Codec libraries the runtime lacks come from their OWN releases here — x264,
-# x265, lame, rubberband and libass — pinned below and used for the build.
-# They are then cleaned OUT of this archive: each is a separate release that the
-# consuming app pins and unpacks alongside this one, putting every lib/ on
-# LD_LIBRARY_PATH. That keeps one copy of libass in an app even when it also
-# ships mpv, and lets x265 move to a new version without re-cutting ffmpeg for
-# apps that only wanted the encoder.
+# Codec libraries the runtime lacks — x264, x265, LAME, Rubber Band and libass —
+# are built as modules below and ship inside this archive, so one pin gives a
+# consumer a working ffmpeg. They used to be separate releases, on the theory
+# that one could move without re-cutting ffmpeg and that an app shipping mpv
+# would then hold a single libass. Neither happened: no consumer pinned one alone,
+# none moved independently, and mpv-stack still carries its own libass. An app
+# shipping both puts this stack's lib/ ahead of mpv-stack's on LD_LIBRARY_PATH,
+# so every process loads the one libass pinned here.
 #
 # Everything else ffmpeg links here — gnutls, dav1d, freetype, opus, theora,
 # v4l2, vorbis, vpx, webp, xml2, vulkan — is present in both org.gnome.Sdk//51
@@ -60,89 +65,104 @@ build-options:
   strip: true
 cleanup:
   - "*.a"
+  # .la files record absolute build paths and mislead a downstream libtool link.
   - "*.la"
   - /include
   - /lib/pkgconfig
   - /lib/cmake
+  - /share/doc
+  - /share/man
   - /share/ffmpeg/examples
-  # Build-time input from the stacks below: shipped by the consuming app from
-  # their own releases, not from here.
-  - /lib/libx264.so*
-  - /lib/libx265.so*
-  - /lib/libmp3lame.so*
-  - /lib/librubberband.so*
-  - /lib/libass.so*
+  # Rubber Band's own CLIs: consumers drive the library through ffmpeg's filter.
   - /bin/rubberband
   - /bin/rubberband-r3
+  # A LADSPA plugin is only reachable from a LADSPA host scanning a system plugin
+  # path; unpacked under an app's /app/extra it can never be found.
+  - /lib/ladspa
+  - /share/ladspa
   - /etc
 
 modules:
-  # Codec libraries for the build, each from its own reusable release. All
-  # cleaned out of the final archive above; the consuming app ships them.
+  # H.264 encoder. Upstream cuts no release tags, so the pin is a bare commit.
   - name: x264
     buildsystem: simple
     build-commands:
-      # Skip the archive's own manifest.json: copying it would leave a stale
-      # record of an unrelated stack in this release, renamed to the misleading
-      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
-      # so it cannot be cleaned away).
-      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+      # --libdir so the .so lands in /app/lib rather than a multiarch path, which
+      # is where a consuming app's LD_LIBRARY_PATH entry points.
+      - ./configure --prefix=/app --libdir=/app/lib --disable-cli --enable-shared
+      - make -j$FLATPAK_BUILDER_N_JOBS
+      - make install
     sources:
-      - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/x264-v2/x264-x264-v2-gnome-51-x86_64.tar.xz
-        sha256: 31f63c4cc872a8cfb07354cf9b648d0949474f498e447c13d8d43ad4695a9b16
+      - type: git
+        url: https://code.videolan.org/videolan/x264.git
+        commit: 0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee
 
+  # H.265 encoder, 8-bit only: the 10/12-bit libraries are a separate multilib
+  # build that no consumer has needed, and adding them later is a new tag.
   - name: x265
-    buildsystem: simple
-    build-commands:
-      # Skip the archive's own manifest.json: copying it would leave a stale
-      # record of an unrelated stack in this release, renamed to the misleading
-      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
-      # so it cannot be cleaned away).
-      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    buildsystem: cmake-ninja
+    # x265's CMakeLists lives in source/, not at the repository root.
+    subdir: source
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_INSTALL_LIBDIR=lib
+      # x265 4.2 still declares cmake_minimum_required below 3.5, which CMake 4
+      # refuses outright.
+      - -DCMAKE_POLICY_VERSION_MINIMUM=3.5
+      - -DENABLE_SHARED=ON
+      - -DENABLE_CLI=OFF
     sources:
-      - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/x265-v2/x265-x265-v2-gnome-51-x86_64.tar.xz
-        sha256: 2d81543116406f447e9d551f8bb88f80ddcde07471b5da99dd30047e15d32a60
+      - type: git
+        url: https://bitbucket.org/multicoreware/x265_git.git
+        tag: "4.2"
+        commit: e7a37608685a1ea61c59342cb19208d688928287
 
+  # MP3 encoder for `-c:a libmp3lame`; the lame/mp3rtp front ends are not built.
   - name: lame
-    buildsystem: simple
-    build-commands:
-      # Skip the archive's own manifest.json: copying it would leave a stale
-      # record of an unrelated stack in this release, renamed to the misleading
-      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
-      # so it cannot be cleaned away).
-      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+      - --disable-frontend
     sources:
       - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/lame-v2/lame-lame-v2-gnome-51-x86_64.tar.xz
-        sha256: b915c4bba401299d7424c5c66ef0bff8da779a4455b10aedd0af45424271ec67
+        url: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+        sha256: ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
 
+  # Time-stretch and pitch-shift for the `rubberband` filter. The FFT and
+  # resampler backends are pinned to the built-in implementations rather than
+  # left on autodetection: fftw3, libsamplerate and speexdsp are all in the GNOME
+  # SDK, so meson would pick one up if upstream changed its defaults and the
+  # archive would silently gain a DT_NEEDED. Built-in links nothing beyond
+  # libstdc++/libm/libgcc/libc.
   - name: rubberband
-    buildsystem: simple
-    build-commands:
-      # Skip the archive's own manifest.json: copying it would leave a stale
-      # record of an unrelated stack in this release, renamed to the misleading
-      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
-      # so it cannot be cleaned away).
-      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    buildsystem: meson
+    config-opts:
+      - --libdir=lib
+      - -Dfft=builtin
+      - -Dresampler=builtin
     sources:
-      - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/rubberband-v2/rubberband-rubberband-v2-gnome-51-x86_64.tar.xz
-        sha256: ec3673aa6d901047aaeaf4911253ec359bb6c5202cb7adfdd3a183c7e8814237
+      - type: git
+        url: https://github.com/breakfastquay/rubberband.git
+        tag: v4.0.0
+        commit: 1d95888bec3ae0a17c0c4af791810d5a63f6bc35
 
+  # ASS/SSA rendering for the `ass` and `subtitles` filters.
   - name: libass
-    buildsystem: simple
-    build-commands:
-      # Skip the archive's own manifest.json: copying it would leave a stale
-      # record of an unrelated stack in this release, renamed to the misleading
-      # manifest-base-N.json (flatpak-builder writes its own after cleanup runs,
-      # so it cannot be cleaned away).
-      - 'find . -mindepth 1 -maxdepth 1 ! -name manifest.json -exec cp -a {} /app/ \;'
+    buildsystem: autotools
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+      # ASM rasteriser paths; nasm comes from the SDK.
+      - --enable-asm
+      # Font lookup through the runtime's fontconfig, so a subtitle naming a
+      # font by family resolves against the host's fonts rather than failing.
+      - --enable-fontconfig
     sources:
-      - type: archive
-        url: https://github.com/flatpark/prebuilt/releases/download/libass-v2/libass-libass-v2-gnome-51-x86_64.tar.xz
-        sha256: 2319d0b986c80e07ea263e37b3a843360d31e064b99325428dafbee9795bf9a6
+      - type: git
+        url: https://github.com/libass/libass.git
+        tag: "0.17.4"
+        commit: bbb3c7f1570a4a021e52683f3fbdf74fe492ae84
 
   - name: ffmpeg
     buildsystem: autotools
@@ -189,6 +209,10 @@ modules:
       # without the matching device simply does not expose them.
       - --enable-vaapi
       - --enable-nvenc
+      # AMF is autodetected, not opt-in: the SDK carries AMD's AMF headers, so
+      # without this the *_amf encoders come back (they did in -v2) and fail at
+      # encode time, the case the header describes.
+      - --disable-amf
     sources:
       - type: git
         url: https://github.com/FFmpeg/FFmpeg.git

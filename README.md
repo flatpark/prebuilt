@@ -33,12 +33,7 @@ rebuilding from the manifest at the tag, not by shipping them to every user.
 | `openssl-1.1-compat` | OpenSSL 1.1.1w shared libraries only (`libssl.so.1.1`, `libcrypto.so.1.1`) — no headers, runtime shim | `org.freedesktop.Sdk//26.08` | Legacy payloads whose bundled runtime predates OpenSSL 3 support (e.g. self-contained .NET 5) — **1.1.1 is EOL, see the manifest header** |
 | `wemeet-screenshare-hook` | libportal 0.9.1 + xuwd1/wemeet-wayland-screenshare `libhook.so` (built against `opencv-imgproc`; OpenCV not shipped but **dlopen'd at runtime**, so the app must also ship `opencv-imgproc`) | `org.freedesktop.Sdk//26.08` | `com.tencent.wemeet` (XWayland screen-share hook) |
 | `krb5-gss` | MIT krb5 1.22.1, the load-time closure of `libgssapi_krb5.so.2` and nothing else (`libkrb5`, `libk5crypto`, `libcom_err`, `libkrb5support`) — no KDC/kadmin libraries, no plugin tree, no headers | `org.freedesktop.Sdk//26.08` | Payloads bundling a Qt built with the GSSAPI feature, whose `libQt6Network` then hard-links `libgssapi_krb5.so.2` — `com.interactivebrokers.ibkrdesktop`. **Consumed as extra-data**, see below |
-| `x264` | x264 (commit `0480cb05`), `libx264.so.165`, dev-complete; no CLI | `org.gnome.Sdk//51` | Apps encoding H.264; `ffmpeg-full` builds against it |
-| `x265` | x265 4.2, `libx265.so.216`, 8-bit only, dev-complete; no CLI | `org.gnome.Sdk//51` | Apps encoding H.265; `ffmpeg-full` builds against it |
-| `lame` | LAME 3.100, `libmp3lame.so.0`, dev-complete; no front ends | `org.gnome.Sdk//51` | Apps encoding MP3; `ffmpeg-full` builds against it |
-| `rubberband` | Rubber Band v4.0.0, `librubberband.so.3` + its CLIs; built-in FFT and resampler pinned, so it links nothing beyond libstdc++/libm/libgcc/libc | `org.gnome.Sdk//51` | Time-stretch / pitch-shift; `ffmpeg-full` builds against it for the `rubberband` filter |
-| `libass` | libass 0.17.4, `libass.so.9`, dev-complete, fontconfig enabled | `org.gnome.Sdk//51` | ASS/SSA rendering — `ffmpeg-full` (the `ass` and `subtitles` filters) and, in future, mpv. Released separately so an app shipping both does not end up with two `libass.so.9` deciding by module order |
-| `ffmpeg-full` | FFmpeg n9.0, `ffmpeg` + `ffprobe` + `libav*`; libx264, libx265, libvpx-vp9, prores_ks, VAAPI and NVENC, aac/ac3/libmp3lame/libopus/libvorbis, `ass`/`subtitles`/`drawtext`. **No QSV or AMF** — see the manifest header | `org.gnome.Sdk//51` | Apps that drive ffmpeg as a tool because the runtime's own has no libass — `dk.nikse.subtitleedit`. Ships none of the codec libraries it links; the app pins those releases too |
+| `ffmpeg-full` | FFmpeg n9.0, `ffmpeg` + `ffprobe` + `libav*`; libx264, libx265, libvpx-vp9, prores_ks, VAAPI and NVENC, aac/ac3/libmp3lame/libopus/libvorbis, `ass`/`subtitles`/`drawtext`/`rubberband`. **No QSV or AMF** — see the manifest header. Self-contained: ships the codec libraries the runtime lacks — x264 (`libx264.so.165`), x265 4.2 8-bit (`libx265.so.216`), LAME 3.100, Rubber Band v4.0.0, libass 0.17.4 | `org.gnome.Sdk//51` | Apps that drive ffmpeg as a tool because the runtime's own has no libass — `dk.nikse.subtitleedit`. An app also shipping `mpv-stack` puts this lib/ first on `LD_LIBRARY_PATH`, so one libass (0.17.4) is loaded |
 | `leptonica` | Leptonica 1.85.0, `libleptonica.so.6`, dev-complete; no demo programs | `org.gnome.Sdk//51` | Image processing; `tesseract` builds against it and the consuming app ships both |
 | `tesseract` | Tesseract 5.5.1, `libtesseract.so.5` + the `tesseract` CLI + `share/tessdata` presets. No leptonica, no language data, no training tools | `org.gnome.Sdk//51` | OCR — `dk.nikse.subtitleedit`. Stage `.traineddata` into its `share/tessdata` and point `TESSDATA_PREFIX` there |
 | `uchardet` | uchardet 0.0.8, `libuchardet.so.0`, dev-complete; no CLI | `org.gnome.Sdk//51` | Guessing the encoding of text files an app did not write, e.g. subtitle files |
@@ -57,8 +52,7 @@ A stack can be consumed either way, and the choice decides where the bytes live:
   repository. Content-addressed storage means a stack shared by many apps is
   held once; `ayatana-stack` is one object set for fourteen apps.
 - **`type: extra-data`** (`krb5-gss`, `openssl-1.1-compat`, `opencv-imgproc`, and the
-  ffmpeg and OCR stacks: `x264`, `x265`, `lame`, `rubberband`, `libass`,
-  `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`, `sql-clients`,
+  ffmpeg and OCR stacks: `ffmpeg-full`, `leptonica`, `tesseract`, `uchardet`, `sevenzip`, `sql-clients`,
   `appimage-tools`, `poppler-glib`) —
   the archive is downloaded from this repository's release at install time and
   unpacked by the app's `apply_extra`

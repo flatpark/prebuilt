@@ -76,7 +76,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # --target: tag the commit that was built. Without it the tag lands on
+          # the default branch's head, so a run from a PR branch would tag a
+          # tree that does not contain the manifest it built.
           gh release create "${{ inputs.tag }}" \
+            --target "${{ github.sha }}" \
             "${{ steps.pack.outputs.name }}" \
             "${{ steps.pack.outputs.name }}.sha256" \
             --title "${{ steps.m.outputs.stackdir }} ${{ inputs.tag }} (${{ steps.m.outputs.slug }})" \

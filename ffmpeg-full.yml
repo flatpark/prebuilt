@@ -205,6 +205,10 @@ modules:
       # without the matching device simply does not expose them.
       - --enable-vaapi
       - --enable-nvenc
+      # AMF is autodetected, not opt-in: org.gnome.Sdk//51 carries its headers,
+      # so without this the *_amf encoders come back (they did in -v2) and fail
+      # at encode time, the case the header describes.
+      - --disable-amf
     sources:
       - type: git
         url: https://github.com/FFmpeg/FFmpeg.git

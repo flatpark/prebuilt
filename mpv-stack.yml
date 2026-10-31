@@ -19,6 +19,9 @@
 # sandbox (mpv's own desktop entry, icons, docs and shell completions).
 # flatpak-builder defers cleanup to the end of the build, so removing a
 # module's .pc file does not hide it from the module built after it.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.MpvStack
 runtime: org.gnome.Platform
 runtime-version: "51"

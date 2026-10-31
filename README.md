@@ -80,6 +80,15 @@ Run the `release` workflow (workflow_dispatch) with a tag (e.g. `ayatana-v1`,
 was built, so the workflow can run on a PR's branch to test the real archive
 before merge; a release nothing pins yet can be deleted with its tag and cut
 again. A release no package or stack pins any more is deleted with its tag.
+
+Every manifest declares its arches on a `# release-arches:` line (default
+`x86_64 aarch64`). One run builds all of them natively from the same commit and
+creates the release only when every arch succeeded, with all archives at once.
+The workflow refuses a tag that already exists: a release is never extended
+with another arch later, because a later build would come from whatever the tag
+points at and could name a different base than the archives already there. To
+add an arch, add it to the line and cut a new tag. A stack that pins another
+stack's archive can only list the arches that dependency is published for.
 Rebuild whenever the target runtime major bumps or a stack component is updated; consuming manifests pin the
 archive by sha256 and migrate explicitly. Every stack gets re-cut on a runtime
 major bump, because the artifact name carries the base it was built against and a

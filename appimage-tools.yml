@@ -37,6 +37,9 @@
 # runtime built on it (org.gnome.Platform//50, the org.kde.Platform branches),
 # so one archive serves an AppImage app on any of them. Not app-specific: the
 # name carries no app, the same way ayatana-stack and libxdo do not.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.AppimageTools
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"

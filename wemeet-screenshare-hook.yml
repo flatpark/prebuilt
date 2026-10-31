@@ -12,6 +12,10 @@
 # CONSUMING app must also ship the opencv-imgproc release so the dlopen resolves
 # (see registry/com.tencent.wemeet). OpenCV is consumed here from opencv-imgproc
 # for the build and cleaned out of this archive.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# x86_64 only: the WeMeet package is x86_64-only, and opencv-imgproc is pinned for x86_64 below.
+# release-arches: x86_64
 id: org.flatpark.Prebuilt.WemeetScreenshareHook
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"

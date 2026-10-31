@@ -15,6 +15,9 @@
 # LD_LIBRARY_PATH, which is where the screenshare hook's dlopen() of the
 # UNVERSIONED soname finds it. The unversioned development symlinks are therefore
 # load-bearing at runtime, not just at build time — do not prune them.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.OpenCVImgproc
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"

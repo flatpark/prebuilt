@@ -52,6 +52,9 @@
 # v4l2, vorbis, vpx, webp, xml2, vulkan — is present in both org.gnome.Sdk//51
 # and org.gnome.Platform//51, so it resolves against the runtime and travels
 # with nothing.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.FfmpegFull
 runtime: org.gnome.Platform
 runtime-version: "51"

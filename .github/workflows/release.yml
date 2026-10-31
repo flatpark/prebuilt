@@ -13,26 +13,43 @@ on:
 permissions:
   contents: write
 
+# One run cuts one release: every arch the manifest declares is built from the
+# same commit, and the release is created only after all of them succeed, with
+# all archives at once. A release is never appended to later, so its tag, its
+# manifest and every archive in it always agree.
 jobs:
-  build:
+  plan:
     runs-on: ubuntu-latest
+    outputs:
+      runtime: ${{ steps.m.outputs.runtime }}
+      rtv: ${{ steps.m.outputs.rtv }}
+      sdk: ${{ steps.m.outputs.sdk }}
+      stackdir: ${{ steps.m.outputs.stackdir }}
+      plat: ${{ steps.m.outputs.plat }}
+      matrix: ${{ steps.m.outputs.matrix }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install flatpak-builder
+      - name: Tag must be new
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y flatpak flatpak-builder
+          if gh release view "${{ inputs.tag }}" >/dev/null 2>&1 \
+             || git ls-remote --exit-code --tags origin "refs/tags/${{ inputs.tag }}" >/dev/null; then
+            echo "::error::${{ inputs.tag }} already exists. Cut a new tag; a release is never extended with another arch." >&2
+            exit 1
+          fi
 
       # Runtime/SDK and the archive naming are derived from the manifest itself,
       # so this one workflow serves every stack (GNOME- or freedesktop-based)
-      # without per-stack inputs.
+      # without per-stack inputs. The arches come from the manifest's required
+      # `# release-arches:` line.
       - name: Parse manifest
         id: m
         run: |
           set -euo pipefail
           python3 - "${{ inputs.manifest }}" >> "$GITHUB_OUTPUT" <<'PY'
-          import re, sys, os
+          import json, re, sys, os
           text = open(sys.argv[1]).read()
           def val(key):
               mo = re.search(r'(?m)^%s:\s*(.+?)\s*$' % re.escape(key), text)
@@ -42,46 +59,90 @@ jobs:
           sdk     = val('sdk')
           stackdir = os.path.basename(sys.argv[1])[:-4]  # strip .yml
           plat = 'fd' if 'freedesktop' in runtime else 'gnome' if 'gnome' in runtime else runtime.split('.')[1].lower()
+          mo = re.search(r'(?m)^#\s*release-arches:\s*(.+?)\s*$', text)
+          if not mo:
+              sys.exit(f"{sys.argv[1]}: missing '# release-arches: ...' line")
+          arches = mo.group(1).split()
+          runners = {'x86_64': 'ubuntu-latest', 'aarch64': 'ubuntu-24.04-arm'}
+          bad = [a for a in arches if a not in runners]
+          if bad or not arches:
+              sys.exit(f"{sys.argv[1]}: unknown release-arches {bad or arches}")
+          matrix = {'include': [{'arch': a, 'runner': runners[a]} for a in arches]}
           print(f"runtime={runtime}")
           print(f"rtv={rtv}")
           print(f"sdk={sdk}")
           print(f"stackdir={stackdir}")
-          print(f"slug={plat}-{rtv}-x86_64")
+          print(f"plat={plat}")
+          print(f"matrix={json.dumps(matrix)}")
           PY
+
+  build:
+    needs: plan
+    strategy:
+      fail-fast: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    # Each arch builds natively. The arm image takes apt from ports.ubuntu.com.
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install flatpak-builder
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y flatpak flatpak-builder
 
       - name: Install runtime + SDK
         run: |
           flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
           flatpak install --user -y --noninteractive flathub \
-            "${{ steps.m.outputs.sdk }}//${{ steps.m.outputs.rtv }}" \
-            "${{ steps.m.outputs.runtime }}//${{ steps.m.outputs.rtv }}"
+            "${{ needs.plan.outputs.sdk }}//${{ needs.plan.outputs.rtv }}" \
+            "${{ needs.plan.outputs.runtime }}//${{ needs.plan.outputs.rtv }}"
 
       - name: Build stack
         run: flatpak-builder --user --force-clean --disable-rofiles-fuse builddir "${{ inputs.manifest }}"
 
       - name: Pack
-        id: pack
         run: |
           set -euo pipefail
-          name="${{ steps.m.outputs.stackdir }}-${{ inputs.tag }}-${{ steps.m.outputs.slug }}.tar.xz"
+          stackdir="${{ needs.plan.outputs.stackdir }}"
+          name="$stackdir-${{ inputs.tag }}-${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}-${{ matrix.arch }}.tar.xz"
           # Single top-level dir so flatpak-builder's default strip-components=1
           # leaves lib/... at the extraction root.
-          mv builddir/files "${{ steps.m.outputs.stackdir }}"
+          mv builddir/files "$stackdir"
           # Deterministic-ish tar: sorted names, fixed owner.
-          XZ_OPT=-T0 tar --sort=name --owner=0 --group=0 --numeric-owner -cJf "$name" "${{ steps.m.outputs.stackdir }}"
+          XZ_OPT=-T0 tar --sort=name --owner=0 --group=0 --numeric-owner -cJf "$name" "$stackdir"
           sha256sum "$name" | tee "$name.sha256"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
+          mkdir out && mv "$name" "$name.sha256" out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: archive-${{ matrix.arch }}
+          path: out/
+          if-no-files-found: error
+
+  release:
+    needs: [plan, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: archive-*
+          path: out
+          merge-multiple: true
 
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
+          set -euo pipefail
+          slug="${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}"
+          arches="$(echo '${{ needs.plan.outputs.matrix }}' | jq -r '[.include[].arch] | join(", ")')"
           # --target: tag the commit that was built. Without it the tag lands on
           # the default branch's head, so a run from a PR branch would tag a
           # tree that does not contain the manifest it built.
           gh release create "${{ inputs.tag }}" \
             --target "${{ github.sha }}" \
-            "${{ steps.pack.outputs.name }}" \
-            "${{ steps.pack.outputs.name }}.sha256" \
-            --title "${{ steps.m.outputs.stackdir }} ${{ inputs.tag }} (${{ steps.m.outputs.slug }})" \
-            --notes "Built from ${{ inputs.manifest }} by workflow run ${{ github.run_id }} from commit ${{ github.sha }}. Exact sources, pins and patches: ${{ inputs.manifest }} at this tag."
+            out/* \
+            --title "${{ needs.plan.outputs.stackdir }} ${{ inputs.tag }} ($slug: $arches)" \
+            --notes "Built from ${{ inputs.manifest }} by workflow run ${{ github.run_id }} from commit ${{ github.sha }}, for $arches. Exact sources, pins and patches: ${{ inputs.manifest }} at this tag."

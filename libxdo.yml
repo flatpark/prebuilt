@@ -18,6 +18,9 @@
 #
 # Not app-specific — the name carries no app, so other FlatPark apps can pin the
 # same archive, the same way Tauri apps share ayatana-stack.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.Libxdo
 runtime: org.gnome.Platform
 runtime-version: "51"

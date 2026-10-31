@@ -20,6 +20,10 @@
 # stage its .traineddata files INTO this archive's share/tessdata/ and point
 # TESSDATA_PREFIX there, keeping presets and language data in one directory.
 # The training tools are not built — they are for producing that data, not using it.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# x86_64 only until leptonica is cut for aarch64 and pinned per arch below.
+# release-arches: x86_64
 id: org.flatpark.Prebuilt.Tesseract
 runtime: org.gnome.Platform
 runtime-version: "51"

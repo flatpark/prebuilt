@@ -30,6 +30,9 @@
 # lib/ so it unpacks under the app's private /app/extra/<stack>/ directory; put
 # that lib/ LAST on the app's LD_LIBRARY_PATH, so the libraries are reachable by
 # soname lookup without shadowing anything else in the sandbox.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.Krb5Gss
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"

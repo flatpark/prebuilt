@@ -46,6 +46,9 @@
 #     exist under /app/extra; without the override the authentication plugins
 #     (caching_sha2_password for MySQL 8, dialog, mysql_clear_password) cannot be
 #     loaded and those logins fail.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.SqlClients
 runtime: org.freedesktop.Platform
 runtime-version: "25.08"

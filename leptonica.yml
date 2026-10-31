@@ -9,6 +9,9 @@
 # it. The command-line programs are not built — they are a large set of demos and
 # converters that nothing downstream calls. Its image codecs (zlib, libpng,
 # libjpeg, libtiff, libwebp, giflib) come from the runtime.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.Leptonica
 runtime: org.gnome.Platform
 runtime-version: "51"

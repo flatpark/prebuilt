@@ -8,6 +8,9 @@
 #
 # The archive therefore ships a single file, bin/7zr. A consuming app puts that
 # bin/ on PATH.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.Sevenzip
 runtime: org.gnome.Platform
 runtime-version: "51"

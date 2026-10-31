@@ -21,6 +21,9 @@
 # Consumers must install these under a private directory and put it LAST on the
 # app's LD_LIBRARY_PATH, so the shim is reachable by soname lookup but never
 # shadows the runtime's own OpenSSL 3 for anything else in the sandbox.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.OpenSSL11
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"

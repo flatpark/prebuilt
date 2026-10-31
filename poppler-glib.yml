@@ -21,6 +21,9 @@
 # soname check: libpoppler-glib.so.8 has been stable for years; libpoppler.so.N
 # changes with nearly every Poppler release, but consumers only link the GLib
 # binding, so bumping Poppler here needs no change on their side.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.PopplerGlib
 runtime: org.gnome.Platform
 runtime-version: "51"

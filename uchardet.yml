@@ -7,6 +7,9 @@
 #
 # Dev-complete (library + headers + pkg-config) so a consumer can build against
 # it. The `uchardet` CLI is not shipped: consumers link the library.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
 id: org.flatpark.Prebuilt.Uchardet
 runtime: org.gnome.Platform
 runtime-version: "51"

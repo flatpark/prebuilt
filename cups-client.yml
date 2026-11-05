@@ -1,0 +1,102 @@
+# CUPS command-line clients (lp, lpstat, lpoptions), prebuilt for FlatPark apps.
+#
+# Why this exists: the runtimes ship libcups and lpr, not the System V tools.
+# Apps whose print dialog shells out to them (craft-print in the ArtCraft apps
+# lists printers with `lpstat` and submits jobs with `lp`) show an empty
+# printer list without them, even with --socket=cups granted.
+#
+# First consumer: ai.storyteller.wordcraft. The build is the cups-client module
+# from upstream's own Flatpak manifest (packaging/linux/flatpak/ in
+# storytold/wordcraft, storytold/wordcraft#4909), unchanged except for where the
+# result is installed. libcups is linked statically from this CUPS release, so
+# a runtime update cannot break the tools. They still link the runtime's
+# avahi-client, gnutls and zlib, which every runtime on the freedesktop 26.08
+# base (org.gnome.Platform//51 included) carries.
+#
+# Layout of the archive:
+#
+#   bin/lp, bin/lpstat, bin/lpoptions    the socket wrapper below, one copy each
+#   libexec/cups/{lp,lpstat,lpoptions}   the CUPS binaries
+#   share/licenses/cups/                 LICENSE and NOTICE (Apache-2.0)
+#
+# The wrapper: Flatpak mounts the host's CUPS socket at /var/run/cups/cups.sock,
+# choosing it as flatpak-run-cups.c does from the host's CUPS_SERVER, else the
+# first line spelled exactly `ServerName /path` in ~/.cups/client.conf, else the
+# default. CUPS reads the keyword in any case and takes the last ServerName.
+# When that socket is the one Flatpak mounted, the wrapper points the tool at
+# the mount; when it is a different socket, the tool fails rather than talk to
+# another server. An explicit CUPS_SERVER and a network ServerName are left
+# alone. The logic is upstream's (Apache-2.0); it finds the real binary from its
+# own resolved path, so it works wherever the archive is unpacked.
+#
+# Consume as extra-data, unpacked into /app/extra/cups-client/, and symlink the
+# three tools onto PATH at build time (the targets dangle until install):
+#
+#   for t in lp lpstat lpoptions; do ln -s /app/extra/cups-client/bin/$t /app/bin/$t; done
+#
+# The consumer also needs --socket=cups; --system-talk-name=org.freedesktop.Avahi
+# for `lpstat -e` (driverless printers); --filesystem=~/.cups:ro for the default
+# printer, saved options and a ServerName; and --share=network only for a CUPS
+# server named by address.
+#
+# Left out: libcups itself as a shared library and its headers (the runtime has
+# one), the scheduler, filters, backends, the BSD lp* tools and lpadmin.
+# Compiled-in paths point at /app (data) and /etc (client.conf); the tools read
+# neither for listing printers or submitting a job.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# release-arches: x86_64 aarch64
+id: org.flatpark.Prebuilt.CupsClient
+runtime: org.freedesktop.Platform
+runtime-version: "26.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  # no-debuginfo suppresses the .Debug extension but does NOT strip: on its own
+  # it leaves full DWARF inside the binaries. Strip explicitly. A consumer that
+  # needs symbols rebuilds from this manifest at its release tag.
+  no-debuginfo: true
+  strip: true
+
+modules:
+  - name: cups-client
+    buildsystem: simple
+    build-commands:
+      - >
+        ./configure --prefix=/app --sysconfdir=/etc --localstatedir=/var
+        --with-rundir=/run/cups --with-domainsocket=/run/cups/cups.sock
+        --disable-shared --with-components=libcups --with-dnssd=avahi
+        --with-tls=gnutls --disable-pam --disable-dbus
+      - make -C cups libs -j${FLATPAK_BUILDER_N_JOBS:-1}
+      - make -C systemv lp lpoptions lpstat -j${FLATPAK_BUILDER_N_JOBS:-1}
+      - install -Dm755 -t /app/libexec/cups systemv/lp systemv/lpoptions systemv/lpstat
+      - for tool in lp lpoptions lpstat; do install -Dm755 cups-socket.sh "/app/bin/$tool"; done
+      - install -Dm644 -t /app/share/licenses/cups LICENSE NOTICE
+    sources:
+      - type: archive
+        url: https://github.com/OpenPrinting/cups/releases/download/v2.4.20/cups-2.4.20-source.tar.gz
+        sha256: ab4d9cd7f3e58060091d2b24972223d6401675f11c49b65abf4f6ef31dea22ff
+      - type: inline
+        dest-filename: cups-socket.sh
+        contents: |
+          #!/bin/sh
+          # Runs lp, lpstat or lpoptions against the CUPS socket Flatpak mounted.
+          # See cups-client.yml in flatpark/prebuilt for the reasoning.
+          tool=${0##*/}
+          self=$(readlink -f "$0")
+          conf="$HOME/.cups/client.conf"
+          if [ -z "${CUPS_SERVER:-}" ] && [ -r "$conf" ]; then
+            server=$(sed -n 's/^[[:space:]]*[Ss][Ee][Rr][Vv][Ee][Rr][Nn][Aa][Mm][Ee][[:space:]]\{1,\}\([^[:space:]]*\).*/\1/p' "$conf" | tail -n 1)
+            case "$server" in
+            /*)
+              mounted=$(sed -n 's/^[[:space:]]*ServerName \(.*\)$/\1/p' "$conf" | sed 's/^[[:space:]]*//' | grep -m 1 '^/[^:]*$')
+              if [ "$mounted" = "$server" ]; then
+                export CUPS_SERVER=/var/run/cups/cups.sock
+              else
+                echo "$tool: ~/.cups/client.conf names the CUPS socket $server, but Flatpak gave this app ${mounted:-a different one}; give each socket one ServerName line, spelled ServerName" >&2
+                exit 1
+              fi
+              ;;
+            esac
+          fi
+          exec "${self%/bin/*}/libexec/cups/$tool" "$@"

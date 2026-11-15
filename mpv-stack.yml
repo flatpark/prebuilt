@@ -34,6 +34,25 @@ build-options:
   no-debuginfo: true
   strip: true
 modules:
+  # mpv's X11 output (vo=gpu with gpu-context=x11egl/x11vk, and the `wid`
+  # embedding into a foreign X11 window) needs libXpresent, which the GNOME SDK
+  # lacks. Without it meson drops X11 support silently and the stack can only
+  # draw on Wayland or DRM. Shipped here because only mpv links it.
+  - name: libXpresent
+    buildsystem: autotools
+    cleanup:
+      - "*.la"
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+    config-opts:
+      - --libdir=/app/lib
+      - --disable-static
+    sources:
+      - type: archive
+        url: https://xorg.freedesktop.org/archive/individual/lib/libXpresent-1.0.2.tar.xz
+        sha256: 4e5b21b4812206a4b223013606ae31170502c1043038777a1ef8f70c09d37602
+
   - name: libass
     buildsystem: autotools
     cleanup:
@@ -87,6 +106,9 @@ modules:
       - -Dtests=false
       - -Dlua=disabled
       - -Djavascript=disabled
+      # Explicit, so a missing X11 dependency fails the build instead of
+      # producing a Wayland-only libmpv (as mpv-v2 shipped).
+      - -Dx11=enabled
     sources:
       - type: git
         url: https://github.com/mpv-player/mpv.git

@@ -1,0 +1,95 @@
+# noto-fonts — the Noto faces FlatPark packages bundle, mirrored as one archive.
+#
+# Why this exists. The runtimes carry no CJK font at all, and the toolkits that
+# build their own font database (GPUI and other cosmic-text / fontdb apps, Slint)
+# never see the host's fonts through the runtime's fontconfig includes, so a
+# Chinese UI renders as tofu even on a host that has CJK fonts installed. Those
+# packages ship a Noto face as extra-data and list its directory in their own
+# fonts.conf (docs/packagers/solutions/rendering-and-fonts.md in flatpark).
+#
+# Every one of them used to pin the face straight from jsDelivr's GitHub proxy
+# (cdn.jsdelivr.net/gh/notofonts/noto-cjk@Sans2.004/...). jsDelivr stopped
+# serving that 19.5 MB file — HTTP 404 — and every install and update of every
+# consumer failed at once (flatpark/flatpark#1316). A release asset here is a
+# URL FlatPark controls; consumers pin it the way they pin any other stack.
+#
+# Contents, flat in share/fonts so a consumer can hand that one directory to
+# fontconfig, SLINT_FONT_PATH or SLINT_DEFAULT_FONT:
+#
+#   share/fonts/NotoSansCJK-Regular.ttc  Noto Sans CJK 2.004 Regular, the OTC
+#                                        with the SC/TC/HK/JP/KR families
+#   share/fonts/NotoSans-Regular.ttf     Noto Sans Regular (Latin, Greek,
+#                                        Cyrillic), hinted, monthly release
+#                                        2026.05.01 — for apps whose font set
+#                                        is *only* what they bundle
+#   share/licenses/noto-fonts/           the SIL OFL 1.1 texts, which the
+#                                        license requires to travel with the fonts
+#
+# Both faces are byte-identical to the upstream files (sources pinned below by
+# sha256); nothing is subset, renamed or rebuilt. Deliberately left out: the
+# other CJK weights, Serif, Mono and the variable fonts — no consumer asks for
+# them, and the Regular OTC alone is 19.5 MB. A consumer needing another weight
+# adds it here under a new tag rather than pinning a third-party CDN again.
+#
+# Consume it as **extra-data**: apply_extra unpacks it to /app/extra/noto-fonts
+# and the app's fonts.conf (or Slint variable) names
+# /app/extra/noto-fonts/share/fonts. Fonts carry no machine code, so the
+# archive does not depend on the SDK it was "built" with; the fd-26.08 name is
+# only the workflow's naming, and any runtime may pin it.
+
+# Every release of this stack is cut for these arches together (release workflow).
+# The bytes are identical on both; aarch64 exists so an aarch64 consumer pins a
+# name that says its arch.
+# release-arches: x86_64 aarch64
+id: org.flatpark.Prebuilt.NotoFonts
+runtime: org.freedesktop.Platform
+runtime-version: "26.08"
+sdk: org.freedesktop.Sdk
+command: /usr/bin/true
+build-options:
+  # Nothing here is an ELF; kept for the convention every stack follows.
+  no-debuginfo: true
+  strip: true
+
+modules:
+  - name: noto-fonts
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 -t /app/share/fonts NotoSansCJK-Regular.ttc NotoSans-Regular.ttf
+      - install -Dm644 noto-cjk-LICENSE /app/share/licenses/noto-fonts/NotoSansCJK-LICENSE
+      - install -Dm644 noto-sans-LICENSE /app/share/licenses/noto-fonts/NotoSans-LICENSE
+    sources:
+      # Tag-pinned from the repository itself rather than a CDN proxy:
+      # raw.githubusercontent.com serves the tag's blob as is (not LFS).
+      - type: file
+        url: https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/Sans/OTC/NotoSansCJK-Regular.ttc
+        sha256: b76b0433203017ca80401b2ee0dd69350349871c4b19d504c34dbdd80541690a
+        dest-filename: NotoSansCJK-Regular.ttc
+      - type: file
+        url: https://raw.githubusercontent.com/notofonts/noto-cjk/Sans2.004/LICENSE
+        sha256: 6a73f9541c2de74158c0e7cf6b0a58ef774f5a780bf191f2d7ec9cc53efe2bf2
+        dest-filename: noto-cjk-LICENSE
+      - type: file
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.05.01/fonts/NotoSans/hinted/ttf/NotoSans-Regular.ttf
+        sha256: 478c558ea716033cd60c03438f628dfa75694dcf6b5f6d505a2f05fd2b4f3823
+        dest-filename: NotoSans-Regular.ttf
+      - type: file
+        url: https://raw.githubusercontent.com/notofonts/notofonts.github.io/noto-monthly-release-2026.05.01/fonts/LICENSE
+        sha256: f2095b08bed08b23a6fe26112fcd679a2bee3f002eef077eb05d215ed1051bd8
+        dest-filename: noto-sans-LICENSE
+
+  # Keep only share/fonts and share/licenses. (flatpak-builder writes
+  # manifest.json at finish, after this runs, so the archive carries it like
+  # every other stack's does.)
+  - name: trim
+    buildsystem: simple
+    build-commands:
+      - |
+        set -eu
+        cd "${FLATPAK_DEST}"
+        find . -mindepth 1 -maxdepth 1 ! -name share -exec rm -rf {} +
+        find share -mindepth 1 -maxdepth 1 ! -name fonts ! -name licenses -exec rm -rf {} +
+        for f in share/fonts/NotoSansCJK-Regular.ttc share/fonts/NotoSans-Regular.ttf; do
+            [ -s "$f" ] || { echo "trim: missing $f" >&2; exit 1; }
+        done
+    sources: []

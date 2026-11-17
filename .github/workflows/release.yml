@@ -63,10 +63,15 @@ jobs:
           if not mo:
               sys.exit(f"{sys.argv[1]}: missing '# release-arches: ...' line")
           arches = mo.group(1).split()
-          runners = {'x86_64': 'ubuntu-latest', 'aarch64': 'ubuntu-24.04-arm'}
+          # `noarch` is for a stack with no machine code (fonts, data): it is
+          # built once, and its archive name carries neither a base nor an
+          # arch, so every app on any runtime and arch pins the same file.
+          runners = {'x86_64': 'ubuntu-latest', 'aarch64': 'ubuntu-24.04-arm', 'noarch': 'ubuntu-latest'}
           bad = [a for a in arches if a not in runners]
           if bad or not arches:
               sys.exit(f"{sys.argv[1]}: unknown release-arches {bad or arches}")
+          if 'noarch' in arches and len(arches) > 1:
+              sys.exit(f"{sys.argv[1]}: noarch cannot be combined with other release-arches")
           matrix = {'include': [{'arch': a, 'runner': runners[a]} for a in arches]}
           print(f"runtime={runtime}")
           print(f"rtv={rtv}")
@@ -105,7 +110,11 @@ jobs:
         run: |
           set -euo pipefail
           stackdir="${{ needs.plan.outputs.stackdir }}"
-          name="$stackdir-${{ inputs.tag }}-${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}-${{ matrix.arch }}.tar.xz"
+          if [ "${{ matrix.arch }}" = noarch ]; then
+            name="$stackdir-${{ inputs.tag }}-noarch.tar.xz"
+          else
+            name="$stackdir-${{ inputs.tag }}-${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}-${{ matrix.arch }}.tar.xz"
+          fi
           # Single top-level dir so flatpak-builder's default strip-components=1
           # leaves lib/... at the extraction root.
           mv builddir/files "$stackdir"
@@ -136,8 +145,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          slug="${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}"
           arches="$(echo '${{ needs.plan.outputs.matrix }}' | jq -r '[.include[].arch] | join(", ")')"
+          if [ "$arches" = noarch ]; then
+            slug="any runtime"
+          else
+            slug="${{ needs.plan.outputs.plat }}-${{ needs.plan.outputs.rtv }}"
+          fi
           # --target: tag the commit that was built. Without it the tag lands on
           # the default branch's head, so a run from a PR branch would tag a
           # tree that does not contain the manifest it built.

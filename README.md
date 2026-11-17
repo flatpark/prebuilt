@@ -42,7 +42,7 @@ rebuilding from the manifest at the tag, not by shipping them to every user.
 | `poppler-glib` | Poppler 26.10.0, `libpoppler-glib.so.8` + the `libpoppler.so` it links; runtime-only — no headers, no utilities, no Qt/C++ bindings; libcurl, gpgme and NSS backends off | `org.gnome.Sdk//51` | Payloads linking the Poppler GLib binding — `io.github.lgse.Strata`. **Consumed as extra-data**, see below |
 | `cups-client` | CUPS 2.4.20 `lp`, `lpstat`, `lpoptions` (libcups linked statically) behind a wrapper that points them at the CUPS socket Flatpak mounted; no scheduler, filters or headers | `org.freedesktop.Sdk//26.08` | Apps whose print dialog shells out to the System V tools, which the runtimes lack — `ai.storyteller.wordcraft`. Consumer needs `--socket=cups`, symlinks `bin/*` onto PATH. **Consumed as extra-data**, see below |
 | `appimage-tools` | `appimage-offset` (prints the appended-SquashFS byte offset from the ELF header) + `unsquashfs` from squashfs-tools 4.6.1 (gzip + xz + lz4 + zstd; no LZO). Two binaries, nothing else | `org.freedesktop.Sdk//26.08` | Repackaging an AppImage-only upstream: `apply_extra` runs `unsquashfs -o $(appimage-offset FILE) -d DEST FILE` to unpack the AppDir with no libfuse and no `/dev/fuse`. Links only libz/lzma/lz4/zstd/pthread/m/c, so it runs under any freedesktop-based runtime. **Consumed as extra-data**, see below |
-| `noto-fonts` | Noto Sans CJK 2.004 Regular (`NotoSansCJK-Regular.ttc`) and Noto Sans Regular (`NotoSans-Regular.ttf`, monthly release 2026.05.01), byte-identical to upstream, flat in `share/fonts`, with their OFL texts. No code, so any runtime may pin it | `org.freedesktop.Sdk//26.08` (naming only) | Apps whose toolkit builds its own font database (GPUI / cosmic-text, Slint) and so never sees host CJK fonts — `dev.navop.Navop`, `com.fluxdown.app`, `com.longbridge.Longbridge` and others. Replaces per-app jsDelivr pins, which went 404 (flatpark/flatpark#1316). **Consumed as extra-data**, see below |
+| `noto-fonts` | Noto Sans CJK 2.004 Regular (`NotoSansCJK-Regular.ttc`) and Noto Sans Regular (`NotoSans-Regular.ttf`, monthly release 2026.05.01), byte-identical to upstream, flat in `share/fonts`, with their OFL texts. No code, so any runtime may pin it | any runtime, any arch: one `noarch` archive | Apps whose toolkit builds its own font database (GPUI / cosmic-text, Slint) and so never sees host CJK fonts — `dev.navop.Navop`, `com.fluxdown.app`, `com.longbridge.Longbridge` and others. Replaces per-app jsDelivr pins, which went 404 (flatpark/flatpark#1316). **Consumed as extra-data**, see below |
 
 ## Archive module or extra-data
 
@@ -84,7 +84,9 @@ before merge; a release nothing pins yet can be deleted with its tag and cut
 again. A release no package or stack pins any more is deleted with its tag.
 
 Every manifest declares its arches on a `# release-arches:` line (default
-`x86_64 aarch64`). One run builds all of them natively from the same commit and
+`x86_64 aarch64`). A stack with no machine code (`noto-fonts`) declares
+`noarch` instead: it is built once, as `<stack>-<tag>-noarch.tar.xz` with no
+base or arch in the name, and is not re-cut on a runtime bump. One run builds all of them natively from the same commit and
 creates the release only when every arch succeeded, with all archives at once.
 The workflow refuses a tag that already exists: a release is never extended
 with another arch later, because a later build would come from whatever the tag

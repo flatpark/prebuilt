@@ -34,13 +34,13 @@
 # Consume it as **extra-data**: apply_extra unpacks it to /app/extra/noto-fonts
 # and the app's fonts.conf (or Slint variable) names
 # /app/extra/noto-fonts/share/fonts. Fonts carry no machine code, so the
-# archive does not depend on the SDK it was "built" with; the fd-26.08 name is
-# only the workflow's naming, and any runtime may pin it.
+# archive depends on neither the SDK it was "built" with nor the arch: pin the
+# same file, without only-arches, on any runtime. The SDK below only runs the
+# install commands, and a runtime bump does not re-cut this stack.
 
-# Every release of this stack is cut for these arches together (release workflow).
-# The bytes are identical on both; aarch64 exists so an aarch64 consumer pins a
-# name that says its arch.
-# release-arches: x86_64 aarch64
+# No machine code: one noarch archive (noto-fonts-<tag>-noarch.tar.xz) serves
+# every arch and runtime; the release workflow builds it once.
+# release-arches: noarch
 id: org.flatpark.Prebuilt.NotoFonts
 runtime: org.freedesktop.Platform
 runtime-version: "26.08"
